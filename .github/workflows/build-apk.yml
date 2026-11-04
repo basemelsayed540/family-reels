@@ -1,0 +1,82 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "supabase/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secrets
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Signing secrets are missing. Add KEYSTORE_BASE64 and KEYSTORE_PASSWORD in Settings > Secrets and variables > Actions, then re-run this workflow."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create Android project
+        run: |
+          flutter create --platforms=android --org com.lammatna --project-name lammatna .
+          git checkout -- lib pubspec.yaml
+
+      - name: Patch Android project
+        run: python3 scripts/patch_android.py
+
+      - name: Restore keystore
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lammatna.jks"
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/lammatna.jks
+          KEY_ALIAS: lammatna
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          flutter build apk --release \
+            --build-number=${{ github.run_number }} \
+            --build-name=1.0.${{ github.run_number }}
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          cp build/app/outputs/flutter-apk/app-release.apk out/lammatna.apk
+          cat > out/version.json <<EOF
+          {"build": ${{ github.run_number }}, "name": "1.0.${{ github.run_number }}", "apk_url": "https://github.com/${{ github.repository }}/releases/download/latest-apk/lammatna.apk"}
+          EOF
+          gh release delete latest-apk --cleanup-tag --yes || true
+          gh release create latest-apk out/lammatna.apk out/version.json \
+            --title "لمّتنا" \
+            --notes "آخر نسخة من تطبيق لمّتنا (رقم البناء ${{ github.run_number }})" \
+            --latest

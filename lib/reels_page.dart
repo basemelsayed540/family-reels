@@ -1,0 +1,505 @@
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+
+import 'data.dart';
+import 'theme.dart';
+
+class ReelsPage extends StatefulWidget {
+  final Profile profile;
+  final String? category;
+  final String? title;
+  const ReelsPage({super.key, required this.profile, this.category, this.title});
+
+  @override
+  State<ReelsPage> createState() => _ReelsPageState();
+}
+
+class _ReelsPageState extends State<ReelsPage> {
+  List<Map<String, dynamic>> _videos = [];
+  final Map<String, Set<String>> _likes = {};
+  bool _loading = true;
+  String? _error;
+  int _index = 0;
+  final PageController _pc = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final videos = await fetchVideos(category: widget.category);
+      final likeRows = rowsOf(await sb.from('video_likes').select('video_id, user_id'));
+      final map = <String, Set<String>>{};
+      for (final l in likeRows) {
+        (map[l['video_id'] as String] ??= <String>{}).add(l['user_id'] as String);
+      }
+      if (!mounted) return;
+      setState(() {
+        _videos = videos;
+        _likes
+          ..clear()
+          ..addAll(map);
+        _loading = false;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'تعذّر تحميل الفيديوهات';
+      });
+    }
+  }
+
+  Future<void> _toggleLike(Map<String, dynamic> video) async {
+    final id = video['id'] as String;
+    final me = widget.profile.id;
+    final set = _likes.putIfAbsent(id, () => <String>{});
+    final had = set.contains(me);
+    setState(() {
+      if (had) {
+        set.remove(me);
+      } else {
+        set.add(me);
+      }
+    });
+    try {
+      if (had) {
+        await sb.from('video_likes').delete().eq('video_id', id).eq('user_id', me);
+      } else {
+        await sb.from('video_likes').insert({'video_id': id, 'user_id': me});
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (had) {
+          set.add(me);
+        } else {
+          set.remove(me);
+        }
+      });
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> video) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف الفيديو؟'),
+        content: const Text('الفيديو هيتحذف نهائيًا من التطبيق.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: compactFilled,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await removeFiles([video['path'] as String]);
+      await sb.from('videos').delete().eq('id', video['id'] as String);
+      if (!mounted) return;
+      setState(() {
+        _videos.removeWhere((v) => v['id'] == video['id']);
+        if (_index >= _videos.length) _index = _videos.isEmpty ? 0 : _videos.length - 1;
+      });
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر الحذف');
+    }
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_error!, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 14),
+            FilledButton(
+              style: compactFilled,
+              onPressed: () {
+                setState(() {
+                  _loading = true;
+                  _error = null;
+                });
+                _load();
+              },
+              child: const Text('حاول تاني'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_videos.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            widget.profile.isAdmin
+                ? 'لسه مفيش فيديوهات. ارفع أول فيديو من تبويب حسابي.'
+                : 'لسه مفيش فيديوهات هنا. أول ما ينزل فيديو هيظهر.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
+          ),
+        ),
+      );
+    }
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      controller: _pc,
+      itemCount: _videos.length,
+      onPageChanged: (i) => setState(() => _index = i),
+      itemBuilder: (context, i) {
+        final video = _videos[i];
+        final likes = _likes[video['id'] as String] ?? const <String>{};
+        return ReelItem(
+          key: ValueKey(video['id']),
+          video: video,
+          active: i == _index,
+          liked: likes.contains(widget.profile.id),
+          likeCount: likes.length,
+          onLike: () => _toggleLike(video),
+          onDelete: widget.profile.isAdmin ? () => _delete(video) : null,
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.darkBg,
+      body: Stack(
+        children: [
+          Positioned.fill(child: _body()),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Row(
+                children: [
+                  if (widget.title != null) const BackButton(color: Colors.white),
+                  Text(
+                    widget.title ?? 'ريلز',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ReelItem extends StatefulWidget {
+  final Map<String, dynamic> video;
+  final bool active;
+  final bool liked;
+  final int likeCount;
+  final VoidCallback onLike;
+  final VoidCallback? onDelete;
+  const ReelItem({
+    super.key,
+    required this.video,
+    required this.active,
+    required this.liked,
+    required this.likeCount,
+    required this.onLike,
+    this.onDelete,
+  });
+
+  @override
+  State<ReelItem> createState() => _ReelItemState();
+}
+
+class _ReelItemState extends State<ReelItem> {
+  VideoPlayerController? _c;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _start();
+  }
+
+  @override
+  void didUpdateWidget(covariant ReelItem old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      _start();
+    } else if (!widget.active && old.active) {
+      _stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    if (_c != null || _loading) return;
+    _loading = true;
+    _error = null;
+    try {
+      final url = await signedUrl(widget.video['path'] as String);
+      final c = VideoPlayerController.networkUrl(Uri.parse(url));
+      await c.initialize();
+      if (!mounted || !widget.active) {
+        await c.dispose();
+        _loading = false;
+        return;
+      }
+      await c.setLooping(true);
+      await c.play();
+      setState(() {
+        _c = c;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'تعذّر تشغيل الفيديو';
+      });
+    }
+  }
+
+  void _stop() {
+    final c = _c;
+    _c = null;
+    _loading = false;
+    c?.dispose();
+  }
+
+  void _togglePlay() {
+    final c = _c;
+    if (c == null) return;
+    if (c.value.isPlaying) {
+      c.pause();
+    } else {
+      c.play();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _c;
+    final name = authorOf(widget.video);
+    final caption = (widget.video['caption'] ?? '').toString();
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(color: const Color(0xFF1F3347)),
+        if (c != null)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _togglePlay,
+            child: ClipRect(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: c.value.size.width,
+                  height: c.value.size.height,
+                  child: VideoPlayer(c),
+                ),
+              ),
+            ),
+          )
+        else if (_error != null)
+          Center(
+            child: Text(
+              _error!,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
+          )
+        else
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
+        if (c != null)
+          Center(
+            child: IgnorePointer(
+              child: ValueListenableBuilder<VideoPlayerValue>(
+                valueListenable: c,
+                builder: (context, v, _) => AnimatedOpacity(
+                  opacity: v.isPlaying ? 0 : 1,
+                  duration: const Duration(milliseconds: 150),
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: const BoxDecoration(
+                      color: Color(0xE61EA0F0),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow_rounded, size: 46, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        PositionedDirectional(
+          start: 20,
+          end: 92,
+          bottom: 28,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: AppColors.pink,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      initialOf(name),
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (caption.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  caption,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
+                ),
+              ],
+              if (c != null) ...[
+                const SizedBox(height: 12),
+                VideoProgressIndicator(
+                  c,
+                  allowScrubbing: false,
+                  padding: EdgeInsets.zero,
+                  colors: const VideoProgressColors(
+                    playedColor: AppColors.darkAccent,
+                    bufferedColor: Color(0x40FFFFFF),
+                    backgroundColor: Color(0x40FFFFFF),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        PositionedDirectional(
+          end: 14,
+          bottom: 28,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ActionButton(
+                icon: widget.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                color: widget.liked ? const Color(0xFFFF6B81) : Colors.white,
+                label: widget.likeCount > 0 ? '${widget.likeCount}' : null,
+                tooltip: 'إعجاب',
+                onTap: widget.onLike,
+              ),
+              if (widget.onDelete != null) ...[
+                const SizedBox(height: 14),
+                _ActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  color: Colors.white,
+                  tooltip: 'حذف الفيديو',
+                  onTap: widget.onDelete!,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String? label;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _ActionButton({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+    required this.onTap,
+    this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: tooltip,
+          onPressed: onTap,
+          style: IconButton.styleFrom(
+            backgroundColor: const Color(0x29FFFFFF),
+            minimumSize: const Size(52, 52),
+          ),
+          icon: Icon(icon, color: color, size: 28),
+        ),
+        if (label != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              label!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
