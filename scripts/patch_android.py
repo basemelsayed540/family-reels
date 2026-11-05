@@ -70,6 +70,13 @@ if "android.permission.INTERNET" not in m:
         1,
     )
 
+if "android.permission.REQUEST_INSTALL_PACKAGES" not in m:
+    m = m.replace(
+        "<application",
+        '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application',
+        1,
+    )
+
 if "<queries>" not in m:
     queries = (
         "<queries>\n"
