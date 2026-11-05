@@ -60,7 +60,7 @@ class _SignedImageState extends State<SignedImage> {
             ),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(6),
             child: Image.network(
               url,
               width: double.infinity,
@@ -100,10 +100,10 @@ class PostCard extends StatelessWidget {
     final imagePath = post['image_path'] as String?;
     final id = post['id'] as String;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        border: Border(bottom: BorderSide(color: AppColors.line, width: 0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,8 +111,8 @@ class PostCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 38,
+                height: 38,
                 decoration: const BoxDecoration(
                   color: AppColors.yellow,
                   shape: BoxShape.circle,
@@ -120,7 +120,7 @@ class PostCard extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   initialOf(name),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ),
               const SizedBox(width: 10),
@@ -130,7 +130,7 @@ class PostCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                     Text(
                       timeAgo(post['created_at'] as String),
@@ -158,14 +158,13 @@ class PostCard extends StatelessWidget {
           ),
           if (body.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(body, style: const TextStyle(fontSize: 16, height: 1.6)),
+            Text(body, style: const TextStyle(fontSize: 15, height: 1.5)),
           ],
           if (imagePath != null && imagePath.isNotEmpty) ...[
             const SizedBox(height: 10),
             SignedImage(path: imagePath),
           ],
-          const SizedBox(height: 6),
-          const Divider(height: 1, color: Color(0xFFE3EAF1)),
+          const SizedBox(height: 4),
           ReactionBar(
             key: ValueKey('post-$id'),
             targetId: id,
@@ -363,25 +362,31 @@ class _PostsPageState extends State<PostsPage> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(0, 10, 0, 24),
           children: [
-            Row(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
               children: [
                 const Expanded(
                   child: Text(
                     'المنشورات',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                   ),
                 ),
                 const NotificationBell(),
               ],
             ),
-            const SizedBox(height: 14),
+            ),
+            const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
+                border: Border(
+                  top: BorderSide(color: AppColors.line, width: 0.6),
+                  bottom: BorderSide(color: AppColors.line, width: 0.6),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -394,7 +399,7 @@ class _PostsPageState extends State<PostsPage> {
                       hintText: 'اكتب حاجة للعيلة...',
                       fillColor: AppColors.bg,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
                     ),
@@ -454,7 +459,7 @@ class _PostsPageState extends State<PostsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.all(40),
@@ -491,7 +496,7 @@ class _PostsPageState extends State<PostsPage> {
             else
               for (final p in _posts)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: PostCard(
                     key: ValueKey(p['id']),
                     post: p,

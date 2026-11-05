@@ -36,18 +36,25 @@ class StoryBubble extends StatelessWidget {
               width: 64,
               height: 64,
               padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.sky, width: 3),
-                color: AppColors.bg,
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [Color(0xFFF5B82E), Color(0xFFE0457B), Color(0xFF8A3FD1)],
+                ),
               ),
               child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: Container(
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                 alignment: Alignment.center,
                 child: Text(
                   initial,
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
+              ),
               ),
             ),
             const SizedBox(height: 6),

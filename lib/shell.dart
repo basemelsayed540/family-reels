@@ -109,15 +109,14 @@ class BottomBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x14000000), blurRadius: 20, offset: Offset(0, -4)),
-        ],
+        border: Border(
+          top: BorderSide(color: dark ? const Color(0xFF26323F) : AppColors.line, width: 0.6),
+        ),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 72,
+          height: 50,
           child: Row(
             children: [
               for (var i = 0; i < _labels.length; i++)
@@ -130,17 +129,8 @@ class BottomBar extends StatelessWidget {
                       children: [
                         Icon(
                           i == index ? _iconsOn[i] : _icons[i],
-                          size: 26,
+                          size: 27,
                           color: i == index ? active : idle,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _labels[i],
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: i == index ? FontWeight.w800 : FontWeight.w600,
-                            color: i == index ? active : idle,
-                          ),
                         ),
                       ],
                     ),

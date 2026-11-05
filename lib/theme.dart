@@ -4,11 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 class AppColors {
   static const blue = Color(0xFF0A74BF); // أزرار ونصوص مميزة
   static const sky = Color(0xFF1EA0F0); // إطارات وأيقونات
-  static const bg = Color(0xFFEAF4FC);
+  static const bg = Color(0xFFF5F7FA);
   static const ink = Color(0xFF1B1F2A);
   static const muted = Color(0xFF4A5565);
   static const gold = Color(0xFFF5B82E);
-  static const line = Color(0xFFC9D6E2);
+  static const line = Color(0xFFDBDFE4);
 
   static const yellow = Color(0xFFFFF0C2);
   static const pink = Color(0xFFFDE1E4);
@@ -42,9 +42,9 @@ ThemeData buildTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
     ),
@@ -52,18 +52,18 @@ ThemeData buildTheme() {
       style: FilledButton.styleFrom(
         backgroundColor: AppColors.blue,
         foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(52),
+        minimumSize: const Size.fromHeight(44),
         shape: const StadiumBorder(),
-        textStyle: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800),
+        textStyle: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.ink,
-        minimumSize: const Size.fromHeight(48),
-        side: const BorderSide(color: AppColors.line, width: 2),
+        minimumSize: const Size.fromHeight(40),
+        side: const BorderSide(color: AppColors.line, width: 1),
         shape: const StadiumBorder(),
-        textStyle: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w800),
+        textStyle: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.w700),
       ),
     ),
   );
@@ -77,12 +77,12 @@ void showMsg(BuildContext context, String text) {
 
 /// أزرار صغيرة تُستخدم داخل Row أو Dialog (الثيم الأساسي يجعل الزر بعرض كامل)
 final ButtonStyle compactFilled = FilledButton.styleFrom(
-  minimumSize: const Size(0, 44),
-  padding: const EdgeInsets.symmetric(horizontal: 20),
+  minimumSize: const Size(0, 38),
+  padding: const EdgeInsets.symmetric(horizontal: 16),
 );
 final ButtonStyle compactOutlined = OutlinedButton.styleFrom(
-  minimumSize: const Size(0, 44),
-  padding: const EdgeInsets.symmetric(horizontal: 20),
+  minimumSize: const Size(0, 38),
+  padding: const EdgeInsets.symmetric(horizontal: 16),
 );
 
 IconData categoryIcon(String key) {

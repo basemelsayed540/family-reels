@@ -126,16 +126,16 @@ class _HomePageState extends State<HomePage> {
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
               children: [
                 _header(data.pending),
-                const SizedBox(height: 20),
-                _storiesRow(data.stories),
-                const SizedBox(height: 20),
-                _banner(data.videos),
-                const SizedBox(height: 22),
-                const Text('الأقسام', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
+                _storiesRow(data.stories),
+                const SizedBox(height: 12),
+                _banner(data.videos),
+                const SizedBox(height: 14),
+                const Text('الأقسام', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
                 _sections(data.videos),
                 if (data.errors.isNotEmpty) ...[
                   const SizedBox(height: 18),
@@ -164,14 +164,14 @@ class _HomePageState extends State<HomePage> {
     return Row(
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 38,
+          height: 38,
           decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Text(
             initialOf(widget.profile.name),
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: AppColors.blue,
             ),
@@ -190,7 +190,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const Text(
                 AppConfig.appName,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
               ),
             ],
           ),
@@ -202,7 +202,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _storiesRow(List<StoryGroup> groups) {
     return SizedBox(
-      height: 96,
+      height: 90,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
@@ -233,10 +233,10 @@ class _HomePageState extends State<HomePage> {
         : 'ارفع أول فيديو من تبويب حسابي';
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.blue,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
@@ -260,7 +260,7 @@ class _HomePageState extends State<HomePage> {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     height: 1.3,
@@ -282,7 +282,7 @@ class _HomePageState extends State<HomePage> {
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.blue,
-                minimumSize: const Size(0, 46),
+                minimumSize: const Size(0, 38),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
               onPressed: widget.onOpenReels,
@@ -299,9 +299,9 @@ class _HomePageState extends State<HomePage> {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.25,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 1.9,
       children: [
         for (final c in categories)
           _SectionTile(
@@ -328,19 +328,19 @@ class _SectionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: categoryColor(category.key),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 32,
+                height: 32,
                 decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                 child: Icon(
                   categoryIcon(category.key),
@@ -352,7 +352,7 @@ class _SectionTile extends StatelessWidget {
                 children: [
                   Text(
                     category.title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                   Text(
                     '$count فيديو',

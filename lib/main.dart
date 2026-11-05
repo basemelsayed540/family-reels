@@ -35,6 +35,13 @@ class LammatnaApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: TextScaler.linear(0.86 * mq.textScaler.scale(1))),
+          child: child!,
+        );
+      },
       home: const AuthGate(),
     );
   }
