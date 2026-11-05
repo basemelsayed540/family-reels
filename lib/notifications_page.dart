@@ -126,6 +126,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return '$who تفاعل بـ 😢 على ${_targetLabel(n)}';
       case 'angry':
         return '$who تفاعل بـ 😡 على ${_targetLabel(n)}';
+      case 'new_video':
+        return preview.isEmpty
+            ? '$who رفع فيديو جديد'
+            : '$who رفع فيديو جديد: "$preview"';
       default:
         return who;
     }
@@ -145,6 +149,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Icons.sentiment_dissatisfied_rounded;
       case 'angry':
         return Icons.sentiment_very_dissatisfied_rounded;
+      case 'new_video':
+        return Icons.play_circle_fill_rounded;
       default:
         return Icons.chat_bubble_rounded;
     }
@@ -164,6 +170,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return const Color(0xFF4A7BB7);
       case 'angry':
         return const Color(0xFFD64525);
+      case 'new_video':
+        return AppColors.blue;
       default:
         return const Color(0xFF2F855A);
     }

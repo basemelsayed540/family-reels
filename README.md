@@ -12,7 +12,7 @@
 
 ## إعداد لمرة واحدة
 
-1. **Supabase:** افتح SQL Editor وشغّل `supabase/setup.sql` ثم `supabase/social.sql` (المنشورات والتعليقات والإشعارات) ثم `supabase/reactions.sql` (الريأكشنز الستة) ثم `supabase/members.sql` (نشر كل الأعضاء + التعديل والحذف).
+1. **Supabase:** افتح SQL Editor وشغّل `supabase/setup.sql` ثم `supabase/social.sql` (المنشورات والتعليقات والإشعارات) ثم `supabase/reactions.sql` (الريأكشنز الستة) ثم `supabase/members.sql` (نشر كل الأعضاء + التعديل والحذف) ثم `supabase/new_video_notifications.sql` (إشعارات الفيديوهات الجديدة).
 2. **Supabase:** من Authentication ثم Sign In / Providers ثم Email، اقفل **Confirm email**.
 3. **GitHub:** من Settings ثم Secrets and variables ثم Actions أضف سرّين:
    - `KEYSTORE_BASE64`

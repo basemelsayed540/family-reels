@@ -45,10 +45,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget _page() {
     switch (_index) {
       case 0:
-        return HomePage(
-          profile: widget.profile,
-          onOpenReels: () => setState(() => _index = 2),
-        );
+        return HomePage(profile: widget.profile);
       case 1:
         return PostsPage(profile: widget.profile);
       case 2:

@@ -18,8 +18,7 @@ class _HomeData {
 
 class HomePage extends StatefulWidget {
   final Profile profile;
-  final VoidCallback onOpenReels;
-  const HomePage({super.key, required this.profile, required this.onOpenReels});
+  const HomePage({super.key, required this.profile});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -131,9 +130,7 @@ class _HomePageState extends State<HomePage> {
                 _header(data.pending),
                 const SizedBox(height: 12),
                 _storiesRow(data.stories),
-                const SizedBox(height: 12),
-                _banner(data.videos),
-                const SizedBox(height: 14),
+                const SizedBox(height: 18),
                 const Text('الأقسام', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 _sections(data.videos),
@@ -217,78 +214,6 @@ class _HomePageState extends State<HomePage> {
                 onTap: () => _openStory(g),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _banner(List<Map<String, dynamic>> videos) {
-    final has = videos.isNotEmpty;
-    final latest = has ? videos.first : null;
-    final title = has ? 'فيديو جديد من ${authorOf(latest!)}' : 'لسه مفيش فيديوهات';
-    final sub = has
-        ? ((latest!['caption'] ?? '').toString().isEmpty
-            ? categoryTitle((latest['category'] ?? 'family').toString())
-            : (latest['caption'] as String))
-        : 'ارفع أول فيديو من تبويب حسابي';
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.blue,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (has)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      'جديد',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  sub,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFFE3F2FC)),
-                ),
-              ],
-            ),
-          ),
-          if (has) ...[
-            const SizedBox(width: 12),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.blue,
-                minimumSize: const Size(0, 38),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-              ),
-              onPressed: widget.onOpenReels,
-              child: const Text('شاهد الآن'),
-            ),
-          ],
         ],
       ),
     );
