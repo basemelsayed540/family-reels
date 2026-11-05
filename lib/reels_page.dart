@@ -175,23 +175,30 @@ class _ReelsPageState extends State<ReelsPage> {
     return Scaffold(
       backgroundColor: AppColors.darkBg,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           Positioned.fill(child: _body()),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: Row(
-                children: [
-                  if (widget.title != null) const BackButton(color: Colors.white),
-                  Text(
-                    widget.title ?? 'ريلز',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+          PositionedDirectional(
+            top: 0,
+            start: 0,
+            end: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: Row(
+                  children: [
+                    if (widget.title != null) const BackButton(color: Colors.white),
+                    Text(
+                      widget.title ?? 'ريلز',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
