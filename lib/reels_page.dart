@@ -51,11 +51,11 @@ class _ReelsPageState extends State<ReelsPage> {
         _loading = false;
         _error = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'تعذّر تحميل الفيديوهات';
+        _error = 'تعذّر تحميل الفيديوهات\n$e';
       });
     }
   }
@@ -282,11 +282,11 @@ class _ReelItemState extends State<ReelItem> {
         _c = c;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'تعذّر تشغيل الفيديو';
+        _error = 'تعذّر تشغيل الفيديو\n$e';
       });
     }
   }

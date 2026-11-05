@@ -12,7 +12,8 @@ class _HomeData {
   final List<StoryGroup> stories;
   final List<Map<String, dynamic>> videos;
   final int pending;
-  const _HomeData(this.stories, this.videos, this.pending);
+  final List<String> errors;
+  const _HomeData(this.stories, this.videos, this.pending, this.errors);
 }
 
 class HomePage extends StatefulWidget {
@@ -34,14 +35,29 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<_HomeData> _load() async {
-    final stories = groupStories(await fetchActiveStories());
-    final videos = await fetchVideos();
+    final errors = <String>[];
+    var stories = <StoryGroup>[];
+    var videos = <Map<String, dynamic>>[];
     var pending = 0;
-    if (widget.profile.isAdmin) {
-      final rows = await sb.from('profiles').select('id').eq('status', 'pending');
-      pending = (rows as List).length;
+    try {
+      stories = groupStories(await fetchActiveStories());
+    } catch (e) {
+      errors.add('الستوري: $e');
     }
-    return _HomeData(stories, videos, pending);
+    try {
+      videos = await fetchVideos();
+    } catch (e) {
+      errors.add('الفيديوهات: $e');
+    }
+    if (widget.profile.isAdmin) {
+      try {
+        final rows = await sb.from('profiles').select('id').eq('status', 'pending');
+        pending = (rows as List).length;
+      } catch (e) {
+        errors.add('الطلبات: $e');
+      }
+    }
+    return _HomeData(stories, videos, pending, errors);
   }
 
   Future<void> _refresh() async {
@@ -128,6 +144,21 @@ class _HomePageState extends State<HomePage> {
                 const Text('الأقسام', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 _sections(data.videos),
+                if (data.errors.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDE8E8),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SelectableText(
+                      'تنبيه تقني (ابعته للمطوّر):\n${data.errors.join('\n')}',
+                      textDirection: TextDirection.ltr,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF7A1F1F)),
+                    ),
+                  ),
+                ],
               ],
             ),
           );
