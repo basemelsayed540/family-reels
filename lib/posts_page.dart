@@ -1,0 +1,383 @@
+import 'package:flutter/material.dart';
+
+import 'data.dart';
+import 'notifications_page.dart';
+import 'social.dart';
+import 'theme.dart';
+
+/// بطاقة منشور واحد
+class PostCard extends StatelessWidget {
+  final Map<String, dynamic> post;
+  final Map<String, String> reactions;
+  final int commentCount;
+  final VoidCallback? onDelete;
+  const PostCard({
+    super.key,
+    required this.post,
+    required this.reactions,
+    required this.commentCount,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = authorOf(post);
+    final id = post['id'] as String;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppColors.yellow,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initialOf(name),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      timeAgo(post['created_at'] as String),
+                      style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              if (onDelete != null)
+                IconButton(
+                  tooltip: 'حذف المنشور',
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.muted),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            (post['body'] ?? '').toString(),
+            style: const TextStyle(fontSize: 16, height: 1.6),
+          ),
+          const SizedBox(height: 6),
+          const Divider(height: 1, color: Color(0xFFE3EAF1)),
+          ReactionBar(
+            key: ValueKey('post-$id'),
+            targetId: id,
+            isPost: true,
+            reactions: reactions,
+            commentCount: commentCount,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PostsPage extends StatefulWidget {
+  final Profile profile;
+  const PostsPage({super.key, required this.profile});
+
+  @override
+  State<PostsPage> createState() => _PostsPageState();
+}
+
+class _PostsPageState extends State<PostsPage> {
+  List<Map<String, dynamic>> _posts = [];
+  Map<String, Map<String, String>> _reactions = {};
+  Map<String, int> _counts = {};
+  bool _loading = true;
+  String? _error;
+  bool _posting = false;
+  final _text = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final posts = rowsOf(
+        await sb
+            .from('posts')
+            .select('*, profiles!posts_user_id_fkey(display_name)')
+            .order('created_at', ascending: false),
+      );
+      final reactions = await fetchReactions();
+      final counts = await fetchCommentCounts();
+      if (!mounted) return;
+      setState(() {
+        _posts = posts;
+        _reactions = reactions;
+        _counts = counts;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'تعذّر تحميل المنشورات\n$e';
+      });
+    }
+  }
+
+  Future<void> _publish() async {
+    final body = _text.text.trim();
+    if (body.isEmpty || _posting) return;
+    if (body.length > 1000) {
+      showMsg(context, 'المنشور طويل، أقصى حد 1000 حرف');
+      return;
+    }
+    setState(() => _posting = true);
+    try {
+      await sb.from('posts').insert({'user_id': myId, 'body': body});
+      _text.clear();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await _load();
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر نشر المنشور');
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> post) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف المنشور؟'),
+        content: const Text('هيتحذف المنشور مع تعليقاته.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: compactFilled,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await sb.from('posts').delete().eq('id', post['id'] as String);
+      await _load();
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر الحذف');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'المنشورات',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const NotificationBell(),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _text,
+                    minLines: 2,
+                    maxLines: 6,
+                    decoration: InputDecoration(
+                      hintText: 'اكتب حاجة للعيلة...',
+                      fillColor: AppColors.bg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: FilledButton.icon(
+                      style: compactFilled,
+                      onPressed: _posting ? null : _publish,
+                      icon: const Icon(Icons.send_rounded, size: 18),
+                      label: const Text('انشر'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Column(
+                children: [
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    style: compactFilled,
+                    onPressed: () {
+                      setState(() {
+                        _loading = true;
+                        _error = null;
+                      });
+                      _load();
+                    },
+                    child: const Text('حاول تاني'),
+                  ),
+                ],
+              )
+            else if (_posts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(
+                  child: Text(
+                    'لسه مفيش منشورات. اكتب أول منشور!',
+                    style: TextStyle(color: AppColors.muted, fontSize: 16),
+                  ),
+                ),
+              )
+            else
+              for (final p in _posts)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: PostCard(
+                    key: ValueKey(p['id']),
+                    post: p,
+                    reactions: _reactions[p['id'] as String] ?? const <String, String>{},
+                    commentCount: _counts[p['id'] as String] ?? 0,
+                    onDelete: (iAmAdmin || p['user_id'] == myId) ? () => _delete(p) : null,
+                  ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// صفحة منشور واحد (تُفتح من الإشعارات)
+class PostDetailPage extends StatefulWidget {
+  final String postId;
+  const PostDetailPage({super.key, required this.postId});
+
+  @override
+  State<PostDetailPage> createState() => _PostDetailPageState();
+}
+
+class _PostDetailPageState extends State<PostDetailPage> {
+  Map<String, dynamic>? _post;
+  Map<String, String> _reactions = {};
+  int _count = 0;
+  bool _loading = true;
+  bool _missing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final row = await sb
+          .from('posts')
+          .select('*, profiles!posts_user_id_fkey(display_name)')
+          .eq('id', widget.postId)
+          .maybeSingle();
+      final reactions = await fetchReactions();
+      final counts = await fetchCommentCounts();
+      if (!mounted) return;
+      setState(() {
+        _post = row;
+        _missing = row == null;
+        _reactions = reactions[widget.postId] ?? <String, String>{};
+        _count = counts[widget.postId] ?? 0;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _missing = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(backgroundColor: AppColors.bg, title: const Text('المنشور')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _missing || _post == null
+              ? const Center(child: Text('المنشور ده اتحذف أو مش متاح'))
+              : Column(
+                  children: [
+                    Flexible(
+                      flex: 2,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: PostCard(
+                          post: _post!,
+                          reactions: _reactions,
+                          commentCount: _count,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: CommentsPanel(isPost: true, targetId: widget.postId),
+                    ),
+                  ],
+                ),
+    );
+  }
+}

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'admin_page.dart';
 import 'config.dart';
 import 'data.dart';
+import 'notifications_page.dart';
 import 'reels_page.dart';
 import 'stories_page.dart';
 import 'theme.dart';
@@ -84,13 +84,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     if (ok == true && mounted) _refresh();
-  }
-
-  Future<void> _openAdmin() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AdminPage(profile: widget.profile)),
-    );
-    if (mounted) _refresh();
   }
 
   void _openCategory(Category c) {
@@ -202,20 +195,7 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-        if (widget.profile.isAdmin)
-          IconButton(
-            tooltip: 'طلبات الانضمام',
-            onPressed: _openAdmin,
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              minimumSize: const Size(48, 48),
-            ),
-            icon: Badge(
-              label: Text('$pending'),
-              isLabelVisible: pending > 0,
-              child: const Icon(Icons.notifications_none_rounded, color: AppColors.ink),
-            ),
-          ),
+        const NotificationBell(),
       ],
     );
   }

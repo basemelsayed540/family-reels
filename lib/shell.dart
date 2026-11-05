@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'data.dart';
 import 'home_page.dart';
+import 'posts_page.dart';
 import 'profile_page.dart';
 import 'reels_page.dart';
+import 'social.dart';
 import 'stories_page.dart';
 import 'theme.dart';
 import 'update.dart';
@@ -22,6 +24,8 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    currentProfile = widget.profile;
+    NotifService.start();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       checkForUpdate(context);
@@ -31,16 +35,25 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  @override
+  void dispose() {
+    NotifService.stop();
+    currentProfile = null;
+    super.dispose();
+  }
+
   Widget _page() {
     switch (_index) {
       case 0:
         return HomePage(
           profile: widget.profile,
-          onOpenReels: () => setState(() => _index = 1),
+          onOpenReels: () => setState(() => _index = 2),
         );
       case 1:
-        return ReelsPage(profile: widget.profile);
+        return PostsPage(profile: widget.profile);
       case 2:
+        return ReelsPage(profile: widget.profile);
+      case 3:
         return StoriesPage(profile: widget.profile);
       default:
         return ProfilePage(profile: widget.profile);
@@ -53,7 +66,7 @@ class _HomeShellState extends State<HomeShell> {
       body: _page(),
       bottomNavigationBar: BottomBar(
         index: _index,
-        dark: _index == 1,
+        dark: _index == 2,
         onTap: (i) => setState(() => _index = i),
       ),
     );
@@ -71,15 +84,17 @@ class BottomBar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _labels = ['الرئيسية', 'ريلز', 'ستوري', 'حسابي'];
+  static const _labels = ['الرئيسية', 'منشورات', 'ريلز', 'ستوري', 'حسابي'];
   static const _icons = [
     Icons.home_outlined,
+    Icons.forum_outlined,
     Icons.play_circle_outline_rounded,
     Icons.donut_large_rounded,
     Icons.person_outline_rounded,
   ];
   static const _iconsOn = [
     Icons.home_rounded,
+    Icons.forum_rounded,
     Icons.play_circle_rounded,
     Icons.donut_large_rounded,
     Icons.person_rounded,
@@ -105,7 +120,7 @@ class BottomBar extends StatelessWidget {
           height: 72,
           child: Row(
             children: [
-              for (var i = 0; i < 4; i++)
+              for (var i = 0; i < _labels.length; i++)
                 Expanded(
                   child: InkWell(
                     onTap: () => onTap(i),

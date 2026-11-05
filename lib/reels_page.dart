@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'data.dart';
+import 'social.dart';
 import 'theme.dart';
 
 class ReelsPage extends StatefulWidget {
   final Profile profile;
   final String? category;
   final String? title;
-  const ReelsPage({super.key, required this.profile, this.category, this.title});
+  final String? videoId;
+  const ReelsPage({
+    super.key,
+    required this.profile,
+    this.category,
+    this.title,
+    this.videoId,
+  });
 
   @override
   State<ReelsPage> createState() => _ReelsPageState();
@@ -16,7 +24,8 @@ class ReelsPage extends StatefulWidget {
 
 class _ReelsPageState extends State<ReelsPage> {
   List<Map<String, dynamic>> _videos = [];
-  final Map<String, Set<String>> _likes = {};
+  Map<String, Map<String, String>> _reactions = {};
+  Map<String, int> _counts = {};
   bool _loading = true;
   String? _error;
   int _index = 0;
@@ -36,18 +45,17 @@ class _ReelsPageState extends State<ReelsPage> {
 
   Future<void> _load() async {
     try {
-      final videos = await fetchVideos(category: widget.category);
-      final likeRows = rowsOf(await sb.from('video_likes').select('video_id, user_id'));
-      final map = <String, Set<String>>{};
-      for (final l in likeRows) {
-        (map[l['video_id'] as String] ??= <String>{}).add(l['user_id'] as String);
+      var videos = await fetchVideos(category: widget.category);
+      if (widget.videoId != null) {
+        videos = videos.where((v) => v['id'] == widget.videoId).toList();
       }
+      final reactions = await fetchReactions();
+      final counts = await fetchCommentCounts();
       if (!mounted) return;
       setState(() {
         _videos = videos;
-        _likes
-          ..clear()
-          ..addAll(map);
+        _reactions = reactions;
+        _counts = counts;
         _loading = false;
         _error = null;
       });
@@ -56,36 +64,6 @@ class _ReelsPageState extends State<ReelsPage> {
       setState(() {
         _loading = false;
         _error = 'تعذّر تحميل الفيديوهات\n$e';
-      });
-    }
-  }
-
-  Future<void> _toggleLike(Map<String, dynamic> video) async {
-    final id = video['id'] as String;
-    final me = widget.profile.id;
-    final set = _likes.putIfAbsent(id, () => <String>{});
-    final had = set.contains(me);
-    setState(() {
-      if (had) {
-        set.remove(me);
-      } else {
-        set.add(me);
-      }
-    });
-    try {
-      if (had) {
-        await sb.from('video_likes').delete().eq('video_id', id).eq('user_id', me);
-      } else {
-        await sb.from('video_likes').insert({'video_id': id, 'user_id': me});
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (had) {
-          set.add(me);
-        } else {
-          set.remove(me);
-        }
       });
     }
   }
@@ -129,23 +107,30 @@ class _ReelsPageState extends State<ReelsPage> {
     }
     if (_error != null) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!, style: const TextStyle(color: Colors.white, fontSize: 16)),
-            const SizedBox(height: 14),
-            FilledButton(
-              style: compactFilled,
-              onPressed: () {
-                setState(() {
-                  _loading = true;
-                  _error = null;
-                });
-                _load();
-              },
-              child: const Text('حاول تاني'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                style: compactFilled,
+                onPressed: () {
+                  setState(() {
+                    _loading = true;
+                    _error = null;
+                  });
+                  _load();
+                },
+                child: const Text('حاول تاني'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -154,9 +139,11 @@ class _ReelsPageState extends State<ReelsPage> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Text(
-            widget.profile.isAdmin
-                ? 'لسه مفيش فيديوهات. ارفع أول فيديو من تبويب حسابي.'
-                : 'لسه مفيش فيديوهات هنا. أول ما ينزل فيديو هيظهر.',
+            widget.videoId != null
+                ? 'الفيديو ده اتحذف أو مش متاح.'
+                : widget.profile.isAdmin
+                    ? 'لسه مفيش فيديوهات. ارفع أول فيديو من تبويب حسابي.'
+                    : 'لسه مفيش فيديوهات هنا. أول ما ينزل فيديو هيظهر.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
           ),
@@ -170,14 +157,13 @@ class _ReelsPageState extends State<ReelsPage> {
       onPageChanged: (i) => setState(() => _index = i),
       itemBuilder: (context, i) {
         final video = _videos[i];
-        final likes = _likes[video['id'] as String] ?? const <String>{};
+        final id = video['id'] as String;
         return ReelItem(
-          key: ValueKey(video['id']),
+          key: ValueKey(id),
           video: video,
           active: i == _index,
-          liked: likes.contains(widget.profile.id),
-          likeCount: likes.length,
-          onLike: () => _toggleLike(video),
+          reactions: _reactions[id] ?? const <String, String>{},
+          commentCount: _counts[id] ?? 0,
           onDelete: widget.profile.isAdmin ? () => _delete(video) : null,
         );
       },
@@ -218,17 +204,15 @@ class _ReelsPageState extends State<ReelsPage> {
 class ReelItem extends StatefulWidget {
   final Map<String, dynamic> video;
   final bool active;
-  final bool liked;
-  final int likeCount;
-  final VoidCallback onLike;
+  final Map<String, String> reactions;
+  final int commentCount;
   final VoidCallback? onDelete;
   const ReelItem({
     super.key,
     required this.video,
     required this.active,
-    required this.liked,
-    required this.likeCount,
-    required this.onLike,
+    required this.reactions,
+    required this.commentCount,
     this.onDelete,
   });
 
@@ -313,6 +297,7 @@ class _ReelItemState extends State<ReelItem> {
     final c = _c;
     final name = authorOf(widget.video);
     final caption = (widget.video['caption'] ?? '').toString();
+    final id = widget.video['id'] as String;
 
     return Stack(
       fit: StackFit.expand,
@@ -335,9 +320,13 @@ class _ReelItemState extends State<ReelItem> {
           )
         else if (_error != null)
           Center(
-            child: Text(
-              _error!,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
             ),
           )
         else
@@ -435,70 +424,30 @@ class _ReelItemState extends State<ReelItem> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ActionButton(
-                icon: widget.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: widget.liked ? const Color(0xFFFF6B81) : Colors.white,
-                label: widget.likeCount > 0 ? '${widget.likeCount}' : null,
-                tooltip: 'إعجاب',
-                onTap: widget.onLike,
+              ReactionBar(
+                key: ValueKey('video-$id'),
+                targetId: id,
+                isPost: false,
+                reactions: widget.reactions,
+                commentCount: widget.commentCount,
+                vertical: true,
+                dark: true,
               ),
               if (widget.onDelete != null) ...[
-                const SizedBox(height: 14),
-                _ActionButton(
-                  icon: Icons.delete_outline_rounded,
-                  color: Colors.white,
+                const SizedBox(height: 4),
+                IconButton(
                   tooltip: 'حذف الفيديو',
-                  onTap: widget.onDelete!,
+                  onPressed: widget.onDelete,
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0x29FFFFFF),
+                    minimumSize: const Size(52, 52),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
                 ),
               ],
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String? label;
-  final String tooltip;
-  final VoidCallback onTap;
-  const _ActionButton({
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-    required this.onTap,
-    this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: tooltip,
-          onPressed: onTap,
-          style: IconButton.styleFrom(
-            backgroundColor: const Color(0x29FFFFFF),
-            minimumSize: const Size(52, 52),
-          ),
-          icon: Icon(icon, color: color, size: 28),
-        ),
-        if (label != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              label!,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
       ],
     );
   }
