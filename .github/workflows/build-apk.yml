@@ -23,7 +23,7 @@ jobs:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check signing secrets
         run: |
@@ -32,7 +32,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -51,7 +51,17 @@ jobs:
         run: python3 scripts/patch_android.py
 
       - name: Restore keystore
-        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lammatna.jks"
+        run: |
+          CLEAN=$(printf '%s' "$KEYSTORE_BASE64" | tr -d ' \n\r\t')
+          echo "KEYSTORE_BASE64 length: ${#CLEAN} (expected 3516)"
+          if ! printf '%s' "$CLEAN" | base64 -d > "$RUNNER_TEMP/lammatna.jks"; then
+            echo "::error::KEYSTORE_BASE64 is not valid base64. Re-copy the WHOLE content of keystore_base64.txt into the secret."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/lammatna.jks" -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+            echo "::error::Keystore could not be opened. Check KEYSTORE_PASSWORD matches the one in GitHub-secrets.txt (no extra spaces)."
+            exit 1
+          fi
 
       - name: Get packages
         run: flutter pub get
