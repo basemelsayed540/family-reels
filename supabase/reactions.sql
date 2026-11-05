@@ -71,8 +71,10 @@ declare
   v_notif_id uuid;
 begin
   -- تحديث من غير تغيير فعلي في نوع الريأكشن: مفيش داعي لإشعار جديد.
-  if tg_op = 'UPDATE' and new.kind is not distinct from old.kind then
-    return new;
+  if tg_op = 'UPDATE' then
+    if new.kind is not distinct from old.kind then
+      return new;
+    end if;
   end if;
 
   if new.post_id is not null then
