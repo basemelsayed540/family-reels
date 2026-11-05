@@ -14,7 +14,8 @@ bool get iAmAdmin => currentProfile?.isAdmin ?? false;
 // بيانات التفاعلات والتعليقات
 // ---------------------------------------------------------------------------
 
-/// خريطة: رقم المنشور/الفيديو -> (رقم المستخدم -> نوع التفاعل like|love)
+/// خريطة: رقم المنشور/الفيديو -> (رقم المستخدم -> نوع التفاعل)
+/// الأنواع: like | love | haha | wow | sad | angry
 Future<Map<String, Map<String, String>>> fetchReactions() async {
   final rows = rowsOf(await sb.from('reactions').select('user_id, post_id, video_id, kind'));
   final out = <String, Map<String, String>>{};
@@ -86,7 +87,52 @@ class NotifService {
 }
 
 // ---------------------------------------------------------------------------
-// شريط التفاعل: إعجاب / قلب / تعليقات
+// أنواع الريأكشنز: إعجاب / حب / ضحك / دهشة / حزن / غضب
+// ---------------------------------------------------------------------------
+
+class ReactionType {
+  final String kind;
+  final String emoji;
+  final String label;
+  final Color color;
+  final Color darkColor;
+  const ReactionType(
+    this.kind,
+    this.emoji,
+    this.label,
+    this.color,
+    this.darkColor,
+  );
+}
+
+const List<ReactionType> reactionTypes = [
+  ReactionType('like', '👍', 'إعجاب', AppColors.blue, AppColors.darkAccent),
+  ReactionType('love', '❤️', 'حب', Color(0xFFE0405A), Color(0xFFFF6B81)),
+  ReactionType('haha', '😂', 'ضحك', Color(0xFFD99400), Color(0xFFFFC94A)),
+  ReactionType('wow', '😮', 'دهشة', Color(0xFFE57300), Color(0xFFFFB05A)),
+  ReactionType('sad', '😢', 'حزن', Color(0xFF4A7BB7), Color(0xFF8FB8E8)),
+  ReactionType('angry', '😡', 'غضب', Color(0xFFD64525), Color(0xFFFF7A5C)),
+];
+
+ReactionType reactionTypeOf(String kind) {
+  for (final r in reactionTypes) {
+    if (r.kind == kind) return r;
+  }
+  return reactionTypes.first;
+}
+
+String? reactionEmojiOf(String kind) {
+  for (final r in reactionTypes) {
+    if (r.kind == kind) return r.emoji;
+  }
+  return null;
+}
+
+bool isReactionKind(String kind) => reactionEmojiOf(kind) != null;
+
+// ---------------------------------------------------------------------------
+// شريط التفاعل: زر إعجاب/ريأكشن + تعليقات
+// ضغطة عادية = إعجاب، وضغطة مطوّلة = شريط الريأكشنز الستة.
 // ---------------------------------------------------------------------------
 
 class ReactionBar extends StatefulWidget {
@@ -110,18 +156,91 @@ class ReactionBar extends StatefulWidget {
   State<ReactionBar> createState() => _ReactionBarState();
 }
 
-class _ReactionBarState extends State<ReactionBar> {
+class _ReactionBarState extends State<ReactionBar>
+    with SingleTickerProviderStateMixin {
   late Map<String, String> _r;
   late int _comments;
+
+  final GlobalKey _reactionKey = GlobalKey();
+  OverlayEntry? _pickerEntry;
+  late final AnimationController _pickerCtrl;
+  late final Animation<double> _pickerFade;
+  late final Animation<double> _pickerScale;
+  bool _closingPicker = false;
+
+  static const double _pickerHeight = 56;
 
   @override
   void initState() {
     super.initState();
     _r = Map<String, String>.of(widget.reactions);
     _comments = widget.commentCount;
+    _pickerCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 170),
+      reverseDuration: const Duration(milliseconds: 120),
+    );
+    _pickerFade = CurvedAnimation(
+      parent: _pickerCtrl,
+      curve: Curves.easeOut,
+    );
+    _pickerScale = Tween<double>(begin: 0.82, end: 1).animate(
+      CurvedAnimation(parent: _pickerCtrl, curve: Curves.easeOutBack),
+    );
   }
 
-  int _count(String kind) => _r.values.where((k) => k == kind).length;
+  @override
+  void didUpdateWidget(covariant ReactionBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_sameReactions(widget.reactions, oldWidget.reactions)) {
+      _r = Map<String, String>.of(widget.reactions);
+    }
+    if (widget.commentCount != oldWidget.commentCount) {
+      _comments = widget.commentCount;
+    }
+  }
+
+  static bool _sameReactions(
+    Map<String, String> a,
+    Map<String, String> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final e in a.entries) {
+      if (b[e.key] != e.value) return false;
+    }
+    return true;
+  }
+
+  @override
+  void dispose() {
+    final entry = _pickerEntry;
+    _pickerEntry = null;
+    try {
+      entry?.remove();
+    } catch (_) {}
+    _pickerCtrl.dispose();
+    super.dispose();
+  }
+
+  int get _total => _r.length;
+
+  List<ReactionType> _topReactions() {
+    if (_r.isEmpty) return <ReactionType>[];
+    final counts = <String, int>{};
+    for (final k in _r.values) {
+      if (isReactionKind(k)) counts[k] = (counts[k] ?? 0) + 1;
+    }
+    final order = <String, int>{
+      for (var i = 0; i < reactionTypes.length; i++) reactionTypes[i].kind: i,
+    };
+    final list = counts.entries.toList()
+      ..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        if (byCount != 0) return byCount;
+        return (order[a.key] ?? 99).compareTo(order[b.key] ?? 99);
+      });
+    return [for (final e in list.take(3)) reactionTypeOf(e.key)];
+  }
 
   Future<void> _react(String kind) async {
     final before = Map<String, String>.of(_r);
@@ -147,6 +266,248 @@ class _ReactionBarState extends State<ReactionBar> {
     }
   }
 
+  void _showPicker() {
+    if (_pickerEntry != null || _closingPicker) return;
+    final box = _reactionKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+
+    final mq = MediaQuery.of(context);
+    final screen = mq.size;
+    final topLeft = box.localToGlobal(Offset.zero);
+    final barWidth = (screen.width - 24).clamp(0.0, 280.0).toDouble();
+    const barHeight = _pickerHeight;
+
+    var left = topLeft.dx + box.size.width / 2 - barWidth / 2;
+    final maxLeft = screen.width - barWidth - 12;
+    if (left < 12) left = 12;
+    if (left > maxLeft) left = maxLeft;
+
+    var top = topLeft.dy - barHeight - 8;
+    final minTop = mq.padding.top + 8;
+    if (top < minTop) {
+      top = topLeft.dy + box.size.height + 8;
+    }
+    final maxTop = screen.height - mq.padding.bottom - barHeight - 8;
+    if (top > maxTop) top = maxTop;
+    if (top < minTop) top = minTop;
+
+    _pickerEntry = OverlayEntry(
+      builder: (_) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _closePicker(),
+            ),
+          ),
+          Positioned(
+            left: left,
+            top: top,
+            width: barWidth,
+            height: barHeight,
+            child: FadeTransition(
+              opacity: _pickerFade,
+              child: ScaleTransition(
+                scale: _pickerScale,
+                child: _pickerBar(barWidth),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_pickerEntry!);
+    _pickerCtrl.forward(from: 0);
+  }
+
+  Future<void> _closePicker({String? select}) async {
+    final entry = _pickerEntry;
+    if (entry == null || _closingPicker) return;
+    _closingPicker = true;
+    if (select != null) _react(select);
+    try {
+      await _pickerCtrl.reverse();
+    } catch (_) {}
+    if (identical(_pickerEntry, entry)) {
+      _pickerEntry = null;
+      try {
+        entry.remove();
+      } catch (_) {}
+    }
+    _closingPicker = false;
+  }
+
+  Widget _pickerBar(double width) {
+    final mine = _r[myId];
+    final itemWidth = (width - 16) / reactionTypes.length;
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: widget.dark ? const Color(0xE61A2838) : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: widget.dark ? const Color(0x33FFFFFF) : AppColors.line,
+            width: 0.7,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(widget.dark ? 0.38 : 0.16),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            for (final rt in reactionTypes)
+              SizedBox(
+                width: itemWidth,
+                height: 44,
+                child: Tooltip(
+                  message: rt.label,
+                  child: InkResponse(
+                    onTap: () => _closePicker(select: rt.kind),
+                    radius: 24,
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: mine == rt.kind
+                            ? rt.color.withOpacity(widget.dark ? 0.30 : 0.12)
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        rt.emoji,
+                        style: const TextStyle(fontSize: 26),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reactionButton(
+    ReactionType? mineType,
+    Color color,
+    List<ReactionType> top3,
+  ) {
+    final child = widget.vertical
+        ? _verticalReaction(mineType, color, top3)
+        : _horizontalReaction(mineType, color, top3);
+    return Semantics(
+      button: true,
+      label: mineType == null ? 'إعجاب' : 'تفاعلك: ${mineType.label}',
+      hint: 'اضغط للإعجاب، واضغط مطوّلًا لاختيار تفاعل',
+      child: InkWell(
+        key: _reactionKey,
+        onTap: () => _react('like'),
+        onLongPress: _showPicker,
+        borderRadius: BorderRadius.circular(999),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _horizontalReaction(
+    ReactionType? mineType,
+    Color color,
+    List<ReactionType> top3,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (mineType == null)
+            Icon(Icons.thumb_up_outlined, color: color, size: 24)
+          else
+            Text(mineType.emoji, style: const TextStyle(fontSize: 22)),
+          if (_total > 0) ...[
+            const SizedBox(width: 6),
+            Text(
+              '$_total',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ],
+          if (top3.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            for (final rt in top3)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 1.5),
+                child: Text(
+                  rt.emoji,
+                  style: const TextStyle(fontSize: 12, height: 1.1),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _verticalReaction(
+    ReactionType? mineType,
+    Color color,
+    List<ReactionType> top3,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: const Color(0x29FFFFFF),
+            shape: BoxShape.circle,
+            border: mineType == null
+                ? null
+                : Border.all(color: color, width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: mineType == null
+              ? Icon(Icons.thumb_up_outlined, color: color, size: 28)
+              : Text(mineType.emoji, style: const TextStyle(fontSize: 27)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          _total > 0 ? '$_total' : ' ',
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (top3.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final rt in top3)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 1),
+                    child: Text(
+                      rt.emoji,
+                      style: const TextStyle(fontSize: 11, height: 1.1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _openComments() async {
     await showCommentsSheet(
       context,
@@ -158,28 +519,26 @@ class _ReactionBarState extends State<ReactionBar> {
     );
   }
 
-  Widget _button({
-    required IconData icon,
-    required Color color,
-    required int count,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
+  Widget _commentButton(Color idle) {
     if (widget.vertical) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            tooltip: tooltip,
-            onPressed: onTap,
+            tooltip: 'تعليقات',
+            onPressed: _openComments,
             style: IconButton.styleFrom(
               backgroundColor: const Color(0x29FFFFFF),
               minimumSize: const Size(52, 52),
             ),
-            icon: Icon(icon, color: color, size: 28),
+            icon: Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: idle,
+              size: 28,
+            ),
           ),
           Text(
-            count > 0 ? '$count' : ' ',
+            _comments > 0 ? '$_comments' : ' ',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13,
@@ -190,22 +549,26 @@ class _ReactionBarState extends State<ReactionBar> {
       );
     }
     return Tooltip(
-      message: tooltip,
+      message: 'تعليقات',
       child: InkWell(
-        onTap: onTap,
+        onTap: _openComments,
         borderRadius: BorderRadius.circular(999),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 24),
-              if (count > 0) ...[
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                color: idle,
+                size: 24,
+              ),
+              if (_comments > 0) ...[
                 const SizedBox(width: 6),
                 Text(
-                  '$count',
+                  '$_comments',
                   style: TextStyle(
-                    color: color,
+                    color: idle,
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                   ),
@@ -221,47 +584,27 @@ class _ReactionBarState extends State<ReactionBar> {
   @override
   Widget build(BuildContext context) {
     final mine = _r[myId];
+    final mineType = mine == null ? null : reactionTypeOf(mine);
     final idle = widget.dark ? Colors.white : AppColors.muted;
-    final likeOn = widget.dark ? AppColors.darkAccent : AppColors.blue;
-    final loveOn = widget.dark ? const Color(0xFFFF6B81) : const Color(0xFFE0405A);
+    final activeColor = mineType == null
+        ? idle
+        : (widget.dark ? mineType.darkColor : mineType.color);
+    final top3 = _topReactions();
 
-    final likeBtn = _button(
-      icon: mine == 'like' ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-      color: mine == 'like' ? likeOn : idle,
-      count: _count('like'),
-      tooltip: 'إعجاب',
-      onTap: () => _react('like'),
-    );
-    final loveBtn = _button(
-      icon: mine == 'love' ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-      color: mine == 'love' ? loveOn : idle,
-      count: _count('love'),
-      tooltip: 'قلب',
-      onTap: () => _react('love'),
-    );
-    final commentBtn = _button(
-      icon: Icons.chat_bubble_outline_rounded,
-      color: idle,
-      count: _comments,
-      tooltip: 'تعليقات',
-      onTap: _openComments,
-    );
+    final reactionBtn = _reactionButton(mineType, activeColor, top3);
+    final commentBtn = _commentButton(idle);
 
     if (widget.vertical) {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          likeBtn,
-          const SizedBox(height: 8),
-          loveBtn,
+          reactionBtn,
           const SizedBox(height: 8),
           commentBtn,
         ],
       );
     }
-    return Row(
-      children: [likeBtn, loveBtn, commentBtn],
-    );
+    return Row(children: [reactionBtn, commentBtn]);
   }
 }
 

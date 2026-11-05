@@ -118,6 +118,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return '$who أعجبه ${_targetLabel(n)}';
       case 'love':
         return '$who حبّ ${_targetLabel(n)}';
+      case 'haha':
+        return '$who تفاعل بـ 😂 على ${_targetLabel(n)}';
+      case 'wow':
+        return '$who تفاعل بـ 😮 على ${_targetLabel(n)}';
+      case 'sad':
+        return '$who تفاعل بـ 😢 على ${_targetLabel(n)}';
+      case 'angry':
+        return '$who تفاعل بـ 😡 على ${_targetLabel(n)}';
       default:
         return who;
     }
@@ -129,6 +137,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return Icons.thumb_up_rounded;
       case 'love':
         return Icons.favorite_rounded;
+      case 'haha':
+        return Icons.sentiment_very_satisfied_rounded;
+      case 'wow':
+        return Icons.sentiment_neutral_rounded;
+      case 'sad':
+        return Icons.sentiment_dissatisfied_rounded;
+      case 'angry':
+        return Icons.sentiment_very_dissatisfied_rounded;
       default:
         return Icons.chat_bubble_rounded;
     }
@@ -140,9 +156,25 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return AppColors.blue;
       case 'love':
         return const Color(0xFFE0405A);
+      case 'haha':
+        return const Color(0xFFD99400);
+      case 'wow':
+        return const Color(0xFFE57300);
+      case 'sad':
+        return const Color(0xFF4A7BB7);
+      case 'angry':
+        return const Color(0xFFD64525);
       default:
         return const Color(0xFF2F855A);
     }
+  }
+
+  Widget _typeIcon(String type) {
+    final emoji = reactionEmojiOf(type);
+    if (emoji != null) {
+      return Center(child: Text(emoji, style: const TextStyle(fontSize: 22)));
+    }
+    return Icon(_icon(type), color: _color(type), size: 22);
   }
 
   Future<void> _open(Map<String, dynamic> n) async {
@@ -270,11 +302,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                         color: Colors.white,
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(
-                                        _icon(n['type'].toString()),
-                                        color: _color(n['type'].toString()),
-                                        size: 22,
-                                      ),
+                                      child: _typeIcon(n['type'].toString()),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
