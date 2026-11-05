@@ -398,6 +398,22 @@ class _CommentsPanelState extends State<CommentsPanel> {
     }
   }
 
+  Future<void> _edit(Map<String, dynamic> c) async {
+    final t = await showEditTextDialog(
+      context,
+      title: 'تعديل التعليق',
+      initial: (c['body'] ?? '').toString(),
+      maxLength: 500,
+    );
+    if (t == null) return;
+    try {
+      await sb.from('comments').update({'body': t}).eq('id', c['id'] as String);
+      await _load();
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر التعديل');
+    }
+  }
+
   Future<void> _delete(String id) async {
     try {
       await sb.from('comments').delete().eq('id', id);
@@ -484,18 +500,36 @@ class _CommentsPanelState extends State<CommentsPanel> {
                                     if (mineOrAdmin)
                                       Align(
                                         alignment: AlignmentDirectional.centerEnd,
-                                        child: InkWell(
-                                          onTap: () => _delete(c['id'] as String),
-                                          child: const Padding(
-                                            padding: EdgeInsets.only(top: 4),
-                                            child: Text(
-                                              'حذف',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFFB3261E),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => _edit(c),
+                                              child: const Padding(
+                                                padding: EdgeInsets.fromLTRB(8, 6, 8, 2),
+                                                child: Text(
+                                                  'تعديل',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: AppColors.blue,
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
+                                            InkWell(
+                                              onTap: () => _delete(c['id'] as String),
+                                              child: const Padding(
+                                                padding: EdgeInsets.fromLTRB(8, 6, 8, 2),
+                                                child: Text(
+                                                  'حذف',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFFB3261E),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                   ],
@@ -535,6 +569,92 @@ class _CommentsPanelState extends State<CommentsPanel> {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// صلاحيات التعديل والحذف: صاحب المحتوى أو الأدمن
+// ---------------------------------------------------------------------------
+
+bool canManage(Map<String, dynamic> row) => iAmAdmin || row['user_id'] == myId;
+
+/// نافذة تعديل نص. ترجّع النص الجديد، أو null لو اتلغت العملية.
+Future<String?> showEditTextDialog(
+  BuildContext context, {
+  required String title,
+  required String initial,
+  int maxLength = 1000,
+  bool allowEmpty = false,
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => _EditTextDialog(
+      title: title,
+      initial: initial,
+      maxLength: maxLength,
+      allowEmpty: allowEmpty,
+    ),
+  );
+}
+
+class _EditTextDialog extends StatefulWidget {
+  final String title;
+  final String initial;
+  final int maxLength;
+  final bool allowEmpty;
+  const _EditTextDialog({
+    required this.title,
+    required this.initial,
+    required this.maxLength,
+    required this.allowEmpty,
+  });
+
+  @override
+  State<_EditTextDialog> createState() => _EditTextDialogState();
+}
+
+class _EditTextDialogState extends State<_EditTextDialog> {
+  late final TextEditingController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _c,
+        autofocus: true,
+        minLines: 1,
+        maxLines: 6,
+        maxLength: widget.maxLength,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          style: compactFilled,
+          onPressed: () {
+            final t = _c.text.trim();
+            if (t.isEmpty && !widget.allowEmpty) return;
+            Navigator.of(context).pop(t);
+          },
+          child: const Text('حفظ'),
         ),
       ],
     );

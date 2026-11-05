@@ -89,15 +89,15 @@ class _ProfilePageState extends State<ProfilePage> {
             style: const TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 22),
+          _tile(Icons.video_call_rounded, 'ارفع فيديو (ريل)', () {
+            Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => UploadPage(profile: p, isStory: false),
+              ),
+            );
+          }),
+          const SizedBox(height: 10),
           if (p.isAdmin) ...[
-            _tile(Icons.video_call_rounded, 'ارفع فيديو (ريل)', () {
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => UploadPage(profile: p, isStory: false),
-                ),
-              );
-            }),
-            const SizedBox(height: 10),
             _tile(Icons.admin_panel_settings_rounded, 'طلبات الانضمام والأعضاء والدعوات', () {
               Navigator.of(context).push<void>(
                 MaterialPageRoute(builder: (_) => AdminPage(profile: p)),

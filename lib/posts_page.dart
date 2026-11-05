@@ -1,9 +1,81 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'data.dart';
 import 'notifications_page.dart';
 import 'social.dart';
 import 'theme.dart';
+
+/// صورة من التخزين الخاص (رابط موقّع) مع عرض بملء الشاشة عند الضغط
+class SignedImage extends StatefulWidget {
+  final String path;
+  const SignedImage({super.key, required this.path});
+
+  @override
+  State<SignedImage> createState() => _SignedImageState();
+}
+
+class _SignedImageState extends State<SignedImage> {
+  late Future<String> _url = signedUrl(widget.path);
+
+  @override
+  void didUpdateWidget(covariant SignedImage old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) _url = signedUrl(widget.path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _url,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return const SizedBox(
+            height: 80,
+            child: Center(child: Text('تعذّر تحميل الصورة')),
+          );
+        }
+        if (!snap.hasData) {
+          return const SizedBox(
+            height: 180,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final url = snap.data!;
+        return GestureDetector(
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                ),
+                body: Center(
+                  child: InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
+                ),
+              ),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.network(
+              url,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox(
+                height: 80,
+                child: Center(child: Text('تعذّر تحميل الصورة')),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 /// بطاقة منشور واحد
 class PostCard extends StatelessWidget {
@@ -11,17 +83,21 @@ class PostCard extends StatelessWidget {
   final Map<String, String> reactions;
   final int commentCount;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
   const PostCard({
     super.key,
     required this.post,
     required this.reactions,
     required this.commentCount,
     this.onDelete,
+    this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
     final name = authorOf(post);
+    final body = (post['body'] ?? '').toString();
+    final imagePath = post['image_path'] as String?;
     final id = post['id'] as String;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
@@ -63,19 +139,31 @@ class PostCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onDelete != null)
-                IconButton(
-                  tooltip: 'حذف المنشور',
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.muted),
+              if (onDelete != null || onEdit != null)
+                PopupMenuButton<String>(
+                  tooltip: 'خيارات',
+                  icon: const Icon(Icons.more_vert_rounded, color: AppColors.muted),
+                  onSelected: (v) {
+                    if (v == 'edit') onEdit?.call();
+                    if (v == 'delete') onDelete?.call();
+                  },
+                  itemBuilder: (_) => [
+                    if (onEdit != null)
+                      const PopupMenuItem(value: 'edit', child: Text('تعديل')),
+                    if (onDelete != null)
+                      const PopupMenuItem(value: 'delete', child: Text('حذف')),
+                  ],
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            (post['body'] ?? '').toString(),
-            style: const TextStyle(fontSize: 16, height: 1.6),
-          ),
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(body, style: const TextStyle(fontSize: 16, height: 1.6)),
+          ],
+          if (imagePath != null && imagePath.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SignedImage(path: imagePath),
+          ],
           const SizedBox(height: 6),
           const Divider(height: 1, color: Color(0xFFE3EAF1)),
           ReactionBar(
@@ -106,6 +194,8 @@ class _PostsPageState extends State<PostsPage> {
   bool _loading = true;
   String? _error;
   bool _posting = false;
+  File? _image;
+  final _picker = ImagePicker();
   final _text = TextEditingController();
 
   @override
@@ -147,23 +237,89 @@ class _PostsPageState extends State<PostsPage> {
     }
   }
 
+  Future<void> _pickImage(ImageSource src) async {
+    try {
+      final x = await _picker.pickImage(source: src, maxWidth: 1800, imageQuality: 85);
+      if (x != null && mounted) setState(() => _image = File(x.path));
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر اختيار الصورة');
+    }
+  }
+
+  void _chooseImage() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('من المعرض'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('من الكاميرا'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickImage(ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _publish() async {
     final body = _text.text.trim();
-    if (body.isEmpty || _posting) return;
+    if ((body.isEmpty && _image == null) || _posting) return;
     if (body.length > 1000) {
       showMsg(context, 'المنشور طويل، أقصى حد 1000 حرف');
       return;
     }
     setState(() => _posting = true);
     try {
-      await sb.from('posts').insert({'user_id': myId, 'body': body});
+      String? imagePath;
+      final img = _image;
+      if (img != null) {
+        imagePath = 'posts/${myId}_${DateTime.now().millisecondsSinceEpoch}.${extOf(img.path)}';
+        await uploadFile(imagePath, img);
+      }
+      await sb.from('posts').insert({
+        'user_id': myId,
+        'body': body,
+        if (imagePath != null) 'image_path': imagePath,
+      });
       _text.clear();
+      _image = null;
       FocusManager.instance.primaryFocus?.unfocus();
       await _load();
-    } catch (_) {
+    } catch (e) {
       if (mounted) showMsg(context, 'تعذّر نشر المنشور');
     } finally {
       if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  Future<void> _edit(Map<String, dynamic> post) async {
+    final hasImage = (post['image_path'] ?? '').toString().isNotEmpty;
+    final t = await showEditTextDialog(
+      context,
+      title: 'تعديل المنشور',
+      initial: (post['body'] ?? '').toString(),
+      allowEmpty: hasImage,
+    );
+    if (t == null) return;
+    try {
+      await sb.from('posts').update({'body': t}).eq('id', post['id'] as String);
+      await _load();
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر التعديل');
     }
   }
 
@@ -188,7 +344,13 @@ class _PostsPageState extends State<PostsPage> {
     );
     if (ok != true) return;
     try {
+      final img = post['image_path'] as String?;
       await sb.from('posts').delete().eq('id', post['id'] as String);
+      if (img != null && img.isNotEmpty) {
+        try {
+          await removeFiles([img]);
+        } catch (_) {}
+      }
       await _load();
     } catch (_) {
       if (mounted) showMsg(context, 'تعذّر الحذف');
@@ -237,15 +399,57 @@ class _PostsPageState extends State<PostsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: FilledButton.icon(
-                      style: compactFilled,
-                      onPressed: _posting ? null : _publish,
-                      icon: const Icon(Icons.send_rounded, size: 18),
-                      label: const Text('انشر'),
+                  if (_image != null) ...[
+                    const SizedBox(height: 10),
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.file(
+                            _image!,
+                            height: 160,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        PositionedDirectional(
+                          top: 6,
+                          end: 6,
+                          child: IconButton(
+                            onPressed: () => setState(() => _image = null),
+                            style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                            icon: const Icon(Icons.close_rounded, color: Colors.white),
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        style: compactOutlined,
+                        onPressed: _posting ? null : _chooseImage,
+                        icon: const Icon(Icons.image_outlined, size: 18),
+                        label: const Text('صورة'),
+                      ),
+                      const Spacer(),
+                      FilledButton.icon(
+                        style: compactFilled,
+                        onPressed: _posting ? null : _publish,
+                        icon: _posting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded, size: 18),
+                        label: const Text('انشر'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -293,7 +497,8 @@ class _PostsPageState extends State<PostsPage> {
                     post: p,
                     reactions: _reactions[p['id'] as String] ?? const <String, String>{},
                     commentCount: _counts[p['id'] as String] ?? 0,
-                    onDelete: (iAmAdmin || p['user_id'] == myId) ? () => _delete(p) : null,
+                    onDelete: canManage(p) ? () => _delete(p) : null,
+                    onEdit: canManage(p) ? () => _edit(p) : null,
                   ),
                 ),
           ],

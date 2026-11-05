@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import 'data.dart';
+import 'social.dart';
 import 'theme.dart';
 import 'upload_page.dart';
 
@@ -417,6 +418,24 @@ class _StoryViewerState extends State<StoryViewer> {
     return widget.profile.isAdmin || item['user_id'] == myId;
   }
 
+  Future<void> _edit() async {
+    final item = _items[_i];
+    final t = await showEditTextDialog(
+      context,
+      title: 'تعديل وصف الستوري',
+      initial: (item['caption'] ?? '').toString(),
+      maxLength: 200,
+      allowEmpty: true,
+    );
+    if (t == null) return;
+    try {
+      await sb.from('stories').update({'caption': t}).eq('id', item['id'] as String);
+      if (mounted) setState(() => item['caption'] = t);
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر التعديل');
+    }
+  }
+
   Future<void> _delete() async {
     final item = _items[_i];
     final ok = await showDialog<bool>(
@@ -558,6 +577,12 @@ class _StoryViewerState extends State<StoryViewer> {
                           ],
                         ),
                       ),
+                      if (_canDelete)
+                        IconButton(
+                          tooltip: 'تعديل',
+                          onPressed: _edit,
+                          icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                        ),
                       if (_canDelete)
                         IconButton(
                           tooltip: 'حذف',

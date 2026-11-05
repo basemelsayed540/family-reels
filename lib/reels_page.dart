@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import 'config.dart';
 import 'data.dart';
 import 'social.dart';
 import 'theme.dart';
@@ -101,6 +102,30 @@ class _ReelsPageState extends State<ReelsPage> {
     }
   }
 
+  Future<void> _edit(Map<String, dynamic> video) async {
+    final r = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => _EditReelDialog(
+        caption: (video['caption'] ?? '').toString(),
+        category: (video['category'] ?? 'family').toString(),
+      ),
+    );
+    if (r == null) return;
+    try {
+      await sb.from('videos').update({
+        'caption': r['caption'],
+        'category': r['category'],
+      }).eq('id', video['id'] as String);
+      if (!mounted) return;
+      setState(() {
+        video['caption'] = r['caption'];
+        video['category'] = r['category'];
+      });
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر التعديل');
+    }
+  }
+
   Widget _body() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -141,9 +166,7 @@ class _ReelsPageState extends State<ReelsPage> {
           child: Text(
             widget.videoId != null
                 ? 'الفيديو ده اتحذف أو مش متاح.'
-                : widget.profile.isAdmin
-                    ? 'لسه مفيش فيديوهات. ارفع أول فيديو من تبويب حسابي.'
-                    : 'لسه مفيش فيديوهات هنا. أول ما ينزل فيديو هيظهر.',
+                : 'لسه مفيش فيديوهات. ارفع أول فيديو من تبويب حسابي.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
           ),
@@ -164,7 +187,8 @@ class _ReelsPageState extends State<ReelsPage> {
           active: i == _index,
           reactions: _reactions[id] ?? const <String, String>{},
           commentCount: _counts[id] ?? 0,
-          onDelete: widget.profile.isAdmin ? () => _delete(video) : null,
+          onDelete: canManage(video) ? () => _delete(video) : null,
+          onEdit: canManage(video) ? () => _edit(video) : null,
         );
       },
     );
@@ -214,6 +238,7 @@ class ReelItem extends StatefulWidget {
   final Map<String, String> reactions;
   final int commentCount;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
   const ReelItem({
     super.key,
     required this.video,
@@ -221,6 +246,7 @@ class ReelItem extends StatefulWidget {
     required this.reactions,
     required this.commentCount,
     this.onDelete,
+    this.onEdit,
   });
 
   @override
@@ -440,6 +466,18 @@ class _ReelItemState extends State<ReelItem> {
                 vertical: true,
                 dark: true,
               ),
+              if (widget.onEdit != null) ...[
+                const SizedBox(height: 4),
+                IconButton(
+                  tooltip: 'تعديل الفيديو',
+                  onPressed: widget.onEdit,
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0x29FFFFFF),
+                    minimumSize: const Size(52, 52),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 26),
+                ),
+              ],
               if (widget.onDelete != null) ...[
                 const SizedBox(height: 4),
                 IconButton(
@@ -454,6 +492,75 @@ class _ReelItemState extends State<ReelItem> {
               ],
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+
+class _EditReelDialog extends StatefulWidget {
+  final String caption;
+  final String category;
+  const _EditReelDialog({required this.caption, required this.category});
+
+  @override
+  State<_EditReelDialog> createState() => _EditReelDialogState();
+}
+
+class _EditReelDialogState extends State<_EditReelDialog> {
+  late final TextEditingController _c = TextEditingController(text: widget.caption);
+  late String _cat = widget.category;
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('تعديل الفيديو'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _c,
+              minLines: 1,
+              maxLines: 4,
+              maxLength: 200,
+              decoration: const InputDecoration(hintText: 'وصف الفيديو'),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final c in categories)
+                  ChoiceChip(
+                    label: Text(c.title),
+                    selected: _cat == c.key,
+                    onSelected: (_) => setState(() => _cat = c.key),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          style: compactFilled,
+          onPressed: () => Navigator.of(context).pop({
+            'caption': _c.text.trim(),
+            'category': _cat,
+          }),
+          child: const Text('حفظ'),
         ),
       ],
     );

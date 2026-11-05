@@ -230,9 +230,7 @@ class _HomePageState extends State<HomePage> {
         ? ((latest!['caption'] ?? '').toString().isEmpty
             ? categoryTitle((latest['category'] ?? 'family').toString())
             : (latest['caption'] as String))
-        : (widget.profile.isAdmin
-            ? 'ارفع أول فيديو من تبويب حسابي'
-            : 'أول ما ينزل فيديو هيظهر هنا');
+        : 'ارفع أول فيديو من تبويب حسابي';
 
     return Container(
       padding: const EdgeInsets.all(20),
