@@ -55,7 +55,7 @@ Future<Map<String, dynamic>?> fetchMyProfile() async {
 }
 
 Future<List<Map<String, dynamic>>> fetchVideos({String? category}) async {
-  var q = sb.from('videos').select('*, profiles(display_name)');
+  var q = sb.from('videos').select('*, profiles!videos_user_id_fkey(display_name)');
   if (category != null) {
     q = q.eq('category', category);
   }
