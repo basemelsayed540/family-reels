@@ -83,6 +83,74 @@ class _MembersListState extends State<_MembersList> {
     }
   }
 
+  Future<void> _edit(Map<String, dynamic> r) async {
+    final res = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => _EditMemberDialog(
+        name: (r['display_name'] ?? '').toString(),
+        role: (r['role'] ?? 'member').toString(),
+        status: (r['status'] ?? 'approved').toString(),
+      ),
+    );
+    if (res == null) return;
+    try {
+      await sb.from('profiles').update(res).eq('id', r['id'] as String);
+      await _refresh();
+      if (mounted) showMsg(context, 'تم حفظ التعديل');
+    } catch (_) {
+      if (mounted) showMsg(context, 'تعذّر حفظ التعديل');
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> r) async {
+    final id = r['id'] as String;
+    final name = (r['display_name'] ?? '').toString();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('حذف $name؟'),
+        content: const Text(
+          'هيتحذف حسابه وكل اللي نشره (فيديوهات وستوري ومنشورات وتعليقات) نهائيًا ومش هينفع تسترجعه.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: compactFilled,
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('حذف نهائي'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      // نحذف ملفاته من التخزين الأول
+      final paths = <String>[];
+      for (final t in ['videos', 'stories']) {
+        final rows = rowsOf(await sb.from(t).select('path').eq('user_id', id));
+        paths.addAll(rows.map((e) => e['path'] as String));
+      }
+      final posts = rowsOf(
+        await sb.from('posts').select('image_path').eq('user_id', id),
+      );
+      for (final e in posts) {
+        final ip = e['image_path'] as String?;
+        if (ip != null && ip.isNotEmpty) paths.add(ip);
+      }
+      try {
+        await removeFiles(paths);
+      } catch (_) {}
+      await sb.rpc('admin_delete_member', params: {'target': id});
+      await _refresh();
+      if (mounted) showMsg(context, 'تم حذف العضو');
+    } catch (e) {
+      if (mounted) showMsg(context, 'تعذّر الحذف. تأكد إنك شغّلت admin_members.sql');
+    }
+  }
+
   String _statusLabel(String s) {
     switch (s) {
       case 'approved':
@@ -170,7 +238,7 @@ class _MembersListState extends State<_MembersList> {
                                 ),
                               ),
                               Text(
-                                _statusLabel(status),
+                                '${_statusLabel(status)}${r['role'] == 'admin' ? ' · مدير' : ''}',
                                 style: const TextStyle(fontSize: 13, color: AppColors.muted),
                               ),
                             ],
@@ -208,6 +276,32 @@ class _MembersListState extends State<_MembersList> {
                           ),
                       ],
                     ),
+                    if (!widget.pendingOnly) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: compactOutlined,
+                              onPressed: () => _edit(r),
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              label: const Text('تعديل'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: compactOutlined.copyWith(
+                                foregroundColor: const WidgetStatePropertyAll(Color(0xFFB3261E)),
+                              ),
+                              onPressed: () => _delete(r),
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                              label: const Text('حذف'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -343,6 +437,102 @@ class _InvitesTabState extends State<_InvitesTab> {
               );
             },
           ),
+        ),
+      ],
+    );
+  }
+}
+
+
+class _EditMemberDialog extends StatefulWidget {
+  final String name;
+  final String role;
+  final String status;
+  const _EditMemberDialog({required this.name, required this.role, required this.status});
+
+  @override
+  State<_EditMemberDialog> createState() => _EditMemberDialogState();
+}
+
+class _EditMemberDialogState extends State<_EditMemberDialog> {
+  late final TextEditingController _c = TextEditingController(text: widget.name);
+  late String _role = widget.role;
+  late String _status = widget.status == 'blocked' ? 'blocked' : 'approved';
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('تعديل العضو'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _c,
+              maxLength: 40,
+              decoration: const InputDecoration(labelText: 'الاسم'),
+            ),
+            const SizedBox(height: 8),
+            const Text('الصلاحية'),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('عضو'),
+                  selected: _role == 'member',
+                  onSelected: (_) => setState(() => _role = 'member'),
+                ),
+                ChoiceChip(
+                  label: const Text('مدير'),
+                  selected: _role == 'admin',
+                  onSelected: (_) => setState(() => _role = 'admin'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text('الحالة'),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('مقبول'),
+                  selected: _status == 'approved',
+                  onSelected: (_) => setState(() => _status = 'approved'),
+                ),
+                ChoiceChip(
+                  label: const Text('محظور'),
+                  selected: _status == 'blocked',
+                  onSelected: (_) => setState(() => _status = 'blocked'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          style: compactFilled,
+          onPressed: () {
+            final n = _c.text.trim();
+            if (n.isEmpty) return;
+            Navigator.of(context).pop({
+              'display_name': n,
+              'role': _role,
+              'status': _status,
+            });
+          },
+          child: const Text('حفظ'),
         ),
       ],
     );
