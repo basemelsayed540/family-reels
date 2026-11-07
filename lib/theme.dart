@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'config.dart';
+
 class AppColors {
   static const blue = Color(0xFF0A74BF); // أزرار ونصوص مميزة
   static const sky = Color(0xFF1EA0F0); // إطارات وأيقونات
@@ -85,41 +87,44 @@ final ButtonStyle compactOutlined = OutlinedButton.styleFrom(
   padding: const EdgeInsets.symmetric(horizontal: 16),
 );
 
-IconData categoryIcon(String key) {
-  switch (key) {
-    case 'family':
-      return Icons.groups_rounded;
-    case 'events':
-      return Icons.event_rounded;
-    case 'trips':
-      return Icons.place_rounded;
-    default:
-      return Icons.photo_library_rounded;
-  }
-}
+const sectionIcons = <IconData>[
+  Icons.groups_rounded,
+  Icons.event_rounded,
+  Icons.place_rounded,
+  Icons.photo_library_rounded,
+  Icons.cake_rounded,
+  Icons.favorite_rounded,
+  Icons.restaurant_rounded,
+  Icons.flight_rounded,
+  Icons.sports_soccer_rounded,
+  Icons.child_care_rounded,
+  Icons.mosque_rounded,
+  Icons.celebration_rounded,
+];
 
-Color categoryColor(String key) {
-  switch (key) {
-    case 'family':
-      return AppColors.yellow;
-    case 'events':
-      return AppColors.pink;
-    case 'trips':
-      return AppColors.green;
-    default:
-      return AppColors.peach;
-  }
-}
+const sectionColors = <Color>[
+  AppColors.yellow,
+  AppColors.pink,
+  AppColors.green,
+  AppColors.peach,
+  AppColors.lightBlue,
+  Color(0xFFE8DDF8),
+];
 
-Color categoryIconColor(String key) {
-  switch (key) {
-    case 'family':
-      return const Color(0xFFB7791F);
-    case 'events':
-      return const Color(0xFFC0425A);
-    case 'trips':
-      return const Color(0xFF2F855A);
-    default:
-      return const Color(0xFFC05621);
-  }
-}
+const sectionIconColors = <Color>[
+  Color(0xFFB7791F),
+  Color(0xFFC0425A),
+  Color(0xFF2F855A),
+  Color(0xFFC05621),
+  Color(0xFF0A74BF),
+  Color(0xFF6B46C1),
+];
+
+IconData categoryIcon(String key) =>
+    sectionIcons[categoryOf(key).icon.abs() % sectionIcons.length];
+
+Color categoryColor(String key) =>
+    sectionColors[categoryOf(key).color.abs() % sectionColors.length];
+
+Color categoryIconColor(String key) =>
+    sectionIconColors[categoryOf(key).color.abs() % sectionIconColors.length];

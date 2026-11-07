@@ -19,15 +19,21 @@ class AppConfig {
 class Category {
   final String key;
   final String title;
-  const Category(this.key, this.title);
+  final int icon; // رقم الأيقونة في sectionIcons
+  final int color; // رقم اللون في sectionColors
+  final String? createdBy;
+  const Category(this.key, this.title, {this.icon = 0, this.color = 0, this.createdBy});
 }
 
-const categories = <Category>[
-  Category('family', 'لمّة العيلة'),
-  Category('events', 'مناسبات'),
-  Category('trips', 'رحلات'),
-  Category('memories', 'ذكريات'),
+/// الأقسام. بتتحدّث من قاعدة البيانات (جدول sections) وفيه قيم افتراضية لو الجدول مش موجود.
+List<Category> categories = [
+  const Category('family', 'لمّة العيلة', icon: 0, color: 0),
+  const Category('events', 'مناسبات', icon: 1, color: 1),
+  const Category('trips', 'رحلات', icon: 2, color: 2),
+  const Category('memories', 'ذكريات', icon: 3, color: 3),
 ];
 
-String categoryTitle(String key) =>
-    categories.firstWhere((c) => c.key == key, orElse: () => categories.first).title;
+Category categoryOf(String key) =>
+    categories.firstWhere((c) => c.key == key, orElse: () => categories.first);
+
+String categoryTitle(String key) => categoryOf(key).title;

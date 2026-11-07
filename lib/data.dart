@@ -179,3 +179,21 @@ String timeAgo(String iso) {
   if (d.inHours < 24) return 'من ${d.inHours} ساعة';
   return 'من ${d.inDays} يوم';
 }
+
+/// تحميل الأقسام من قاعدة البيانات (لو الجدول مش موجود بتفضل الافتراضية)
+Future<void> refreshSections() async {
+  try {
+    final rows = rowsOf(await sb.from('sections').select().order('created_at'));
+    if (rows.isEmpty) return;
+    categories = [
+      for (final r in rows)
+        Category(
+          r['key'] as String,
+          (r['title'] ?? '').toString(),
+          icon: (r['icon'] ?? 0) as int,
+          color: (r['color'] ?? 0) as int,
+          createdBy: r['created_by'] as String?,
+        ),
+    ];
+  } catch (_) {}
+}

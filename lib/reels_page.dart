@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 
 import 'config.dart';
 import 'data.dart';
+import 'saved.dart';
 import 'social.dart';
 import 'theme.dart';
 
@@ -466,6 +467,8 @@ class _ReelItemState extends State<ReelItem> {
                 vertical: true,
                 dark: true,
               ),
+              const SizedBox(height: 4),
+              SaveButton(videoId: id, color: Colors.white, filledBg: true),
               if (widget.onEdit != null) ...[
                 const SizedBox(height: 4),
                 IconButton(

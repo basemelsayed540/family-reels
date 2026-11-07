@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'data.dart';
 import 'notifications_page.dart';
+import 'saved.dart';
 import 'social.dart';
 import 'theme.dart';
 
@@ -139,6 +140,7 @@ class PostCard extends StatelessWidget {
                   ],
                 ),
               ),
+              SaveButton(postId: id),
               if (onDelete != null || onEdit != null)
                 PopupMenuButton<String>(
                   tooltip: 'خيارات',

@@ -4,6 +4,8 @@ import 'config.dart';
 import 'data.dart';
 import 'notifications_page.dart';
 import 'reels_page.dart';
+import 'sections_ui.dart';
+import 'social.dart';
 import 'stories_page.dart';
 import 'theme.dart';
 import 'upload_page.dart';
@@ -38,6 +40,7 @@ class _HomePageState extends State<HomePage> {
     var stories = <StoryGroup>[];
     var videos = <Map<String, dynamic>>[];
     var pending = 0;
+    await refreshSections();
     try {
       stories = groupStories(await fetchActiveStories());
     } catch (e) {
@@ -83,6 +86,19 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     if (ok == true && mounted) _refresh();
+  }
+
+  Future<void> _addSection() async {
+    if (await showSectionDialog(context)) _refresh();
+  }
+
+  Future<void> _manageSection(Category c) async {
+    final mine = iAmAdmin || (c.createdBy != null && c.createdBy == myId);
+    if (!mine) {
+      showMsg(context, 'تعديل القسم للمدير أو لمن أنشأه');
+      return;
+    }
+    if (await showSectionOptions(context, c)) _refresh();
   }
 
   void _openCategory(Category c) {
@@ -131,7 +147,21 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 12),
                 _storiesRow(data.stories),
                 const SizedBox(height: 18),
-                const Text('الأقسام', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'الأقسام',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _addSection,
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('قسم جديد'),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 _sections(data.videos),
                 if (data.errors.isNotEmpty) ...[
@@ -233,6 +263,7 @@ class _HomePageState extends State<HomePage> {
             category: c,
             count: videos.where((v) => v['category'] == c.key).length,
             onTap: () => _openCategory(c),
+            onLongPress: () => _manageSection(c),
           ),
       ],
     );
@@ -243,10 +274,12 @@ class _SectionTile extends StatelessWidget {
   final Category category;
   final int count;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
   const _SectionTile({
     required this.category,
     required this.count,
     required this.onTap,
+    required this.onLongPress,
   });
 
   @override
@@ -256,6 +289,7 @@ class _SectionTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.all(10),
