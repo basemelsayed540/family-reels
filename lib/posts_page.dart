@@ -189,7 +189,6 @@ class PostCard extends StatelessWidget {
                   ],
                 ),
               ),
-              SaveButton(postId: id),
               if (onDelete != null || onEdit != null)
                 PopupMenuButton<String>(
                   tooltip: 'خيارات',
@@ -225,6 +224,7 @@ class PostCard extends StatelessWidget {
             isPost: true,
             reactions: reactions,
             commentCount: commentCount,
+            extra: SaveAction(postId: id),
           ),
         ],
       ),
@@ -439,23 +439,8 @@ class _PostsPageState extends State<PostsPage> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(0, 10, 0, 24),
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'المنشورات',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-                  ),
-                ),
-                const NotificationBell(),
-              ],
-            ),
-            ),
-            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: const BoxDecoration(

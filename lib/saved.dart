@@ -214,3 +214,36 @@ class _SaveSheetState extends State<_SaveSheet> {
     );
   }
 }
+
+/// زر "حفظ" بنص وأيقونة (يُستخدم في صف أزرار المنشور على طريقة فيس بوك)
+class SaveAction extends StatelessWidget {
+  final String? postId;
+  final String? videoId;
+  const SaveAction({super.key, this.postId, this.videoId});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => showSaveSheet(context, postId: postId, videoId: videoId),
+      borderRadius: BorderRadius.circular(8),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bookmark_border_rounded, color: AppColors.muted, size: 20),
+            SizedBox(width: 6),
+            Text(
+              'حفظ',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

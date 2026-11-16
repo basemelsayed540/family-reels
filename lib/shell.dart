@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data.dart';
 import 'home_page.dart';
+import 'notifications_page.dart';
 import 'posts_page.dart';
 import 'profile_page.dart';
 import 'reels_page.dart';
@@ -45,7 +46,10 @@ class _HomeShellState extends State<HomeShell> {
   Widget _page() {
     switch (_index) {
       case 0:
-        return HomePage(profile: widget.profile);
+        return HomePage(
+          profile: widget.profile,
+          onCompose: () => setState(() => _index = 1),
+        );
       case 1:
         return PostsPage(profile: widget.profile);
       case 2:
@@ -59,22 +63,66 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final reels = _index == 2;
     return Scaffold(
-      body: _page(),
-      bottomNavigationBar: BottomBar(
-        index: _index,
-        dark: _index == 2,
-        onTap: (i) => setState(() => _index = i),
+      backgroundColor: reels ? AppColors.darkBg : AppColors.bg,
+      body: Column(
+        children: [
+          Container(
+            color: reels ? AppColors.darkNav : Colors.white,
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!reels)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 6, 10, 4),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'لمّتنا',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.blue,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          const NotificationBell(),
+                        ],
+                      ),
+                    ),
+                  TopTabs(
+                    index: _index,
+                    dark: reels,
+                    onTap: (i) => setState(() => _index = i),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: _page(),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class BottomBar extends StatelessWidget {
+/// تبويبات علوية بأيقونات على طريقة فيس بوك
+class TopTabs extends StatelessWidget {
   final int index;
   final bool dark;
   final ValueChanged<int> onTap;
-  const BottomBar({
+  const TopTabs({
     super.key,
     required this.index,
     required this.dark,
@@ -99,43 +147,48 @@ class BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = dark ? AppColors.darkNav : Colors.white;
     final active = dark ? AppColors.darkAccent : AppColors.blue;
-    final idle = dark ? AppColors.darkMuted : const Color(0xFF5B6472);
-
+    final idle = dark ? AppColors.darkMuted : AppColors.muted;
     return Container(
+      height: 46,
       decoration: BoxDecoration(
-        color: bg,
         border: Border(
-          top: BorderSide(color: dark ? const Color(0xFF26323F) : AppColors.line, width: 0.6),
+          bottom: BorderSide(
+            color: dark ? const Color(0xFF26323F) : AppColors.line,
+            width: 0.8,
+          ),
         ),
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 50,
-          child: Row(
-            children: [
-              for (var i = 0; i < _labels.length; i++)
-                Expanded(
-                  child: InkWell(
-                    onTap: () => onTap(i),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          i == index ? _iconsOn[i] : _icons[i],
-                          size: 27,
-                          color: i == index ? active : idle,
+      child: Row(
+        children: [
+          for (var i = 0; i < _labels.length; i++)
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: i == index,
+                label: _labels[i],
+                child: InkWell(
+                  onTap: () => onTap(i),
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: i == index ? active : Colors.transparent,
+                          width: 3,
                         ),
-                      ],
+                      ),
+                    ),
+                    child: Icon(
+                      i == index ? _iconsOn[i] : _icons[i],
+                      size: 26,
+                      color: i == index ? active : idle,
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }

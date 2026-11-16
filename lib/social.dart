@@ -142,6 +142,7 @@ class ReactionBar extends StatefulWidget {
   final int commentCount;
   final bool vertical;
   final bool dark;
+  final Widget? extra; // زر إضافي (مثل الحفظ) بجانب الإعجاب والتعليق
   const ReactionBar({
     super.key,
     required this.targetId,
@@ -150,6 +151,7 @@ class ReactionBar extends StatefulWidget {
     required this.commentCount,
     this.vertical = false,
     this.dark = false,
+    this.extra,
   });
 
   @override
@@ -408,7 +410,7 @@ class _ReactionBarState extends State<ReactionBar>
         key: _reactionKey,
         onTap: () => _react('like'),
         onLongPress: _showPicker,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: widget.vertical ? BorderRadius.circular(999) : BorderRadius.circular(8),
         child: child,
       ),
     );
@@ -420,36 +422,23 @@ class _ReactionBarState extends State<ReactionBar>
     List<ReactionType> top3,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (mineType == null)
-            Icon(Icons.thumb_up_outlined, color: color, size: 24)
+            Icon(Icons.thumb_up_outlined, color: color, size: 20)
           else
-            Text(mineType.emoji, style: const TextStyle(fontSize: 22)),
-          if (_total > 0) ...[
-            const SizedBox(width: 6),
-            Text(
-              '$_total',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
+            Text(mineType.emoji, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 6),
+          Text(
+            mineType == null ? 'أعجبني' : mineType.label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
             ),
-          ],
-          if (top3.isNotEmpty) ...[
-            const SizedBox(width: 6),
-            for (final rt in top3)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(start: 1.5),
-                child: Text(
-                  rt.emoji,
-                  style: const TextStyle(fontSize: 12, height: 1.1),
-                ),
-              ),
-          ],
+          ),
         ],
       ),
     );
@@ -552,28 +541,22 @@ class _ReactionBarState extends State<ReactionBar>
       message: 'تعليقات',
       child: InkWell(
         onTap: _openComments,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.chat_bubble_outline_rounded,
-                color: idle,
-                size: 24,
-              ),
-              if (_comments > 0) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '$_comments',
-                  style: TextStyle(
-                    color: idle,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
+              Icon(Icons.chat_bubble_outline_rounded, color: idle, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                'تعليق',
+                style: TextStyle(
+                  color: idle,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -604,7 +587,48 @@ class _ReactionBarState extends State<ReactionBar>
         ],
       );
     }
-    return Row(children: [reactionBtn, commentBtn]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_total > 0 || _comments > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
+            child: Row(
+              children: [
+                if (_total > 0) ...[
+                  for (final rt in top3)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 2),
+                      child: Text(rt.emoji, style: const TextStyle(fontSize: 15, height: 1.1)),
+                    ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$_total',
+                    style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                  ),
+                ],
+                const Spacer(),
+                if (_comments > 0)
+                  InkWell(
+                    onTap: _openComments,
+                    child: Text(
+                      '$_comments تعليق',
+                      style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const Divider(height: 1, color: AppColors.line),
+        Row(
+          children: [
+            Expanded(child: reactionBtn),
+            Expanded(child: commentBtn),
+            if (widget.extra != null) Expanded(child: widget.extra!),
+          ],
+        ),
+      ],
+    );
   }
 }
 

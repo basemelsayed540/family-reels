@@ -6,11 +6,11 @@ import 'config.dart';
 class AppColors {
   static const blue = Color(0xFF0A74BF); // أزرار ونصوص مميزة
   static const sky = Color(0xFF1EA0F0); // إطارات وأيقونات
-  static const bg = Color(0xFFF5F7FA);
-  static const ink = Color(0xFF1B1F2A);
-  static const muted = Color(0xFF4A5565);
+  static const bg = Color(0xFFF0F2F5);
+  static const ink = Color(0xFF1C1E21);
+  static const muted = Color(0xFF65676B);
   static const gold = Color(0xFFF5B82E);
-  static const line = Color(0xFFDBDFE4);
+  static const line = Color(0xFFDADDE1);
 
   static const yellow = Color(0xFFFFF0C2);
   static const pink = Color(0xFFFDE1E4);

@@ -25,8 +25,8 @@ class NotificationBell extends StatelessWidget {
             NotifService.refresh();
           },
           style: IconButton.styleFrom(
-            backgroundColor: Colors.white,
-            minimumSize: const Size(48, 48),
+            backgroundColor: const Color(0xFFE4E6EB),
+            minimumSize: const Size(40, 40),
           ),
           icon: Badge(
             label: Text('$count'),

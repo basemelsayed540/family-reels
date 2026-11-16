@@ -20,7 +20,8 @@ class _HomeData {
 
 class HomePage extends StatefulWidget {
   final Profile profile;
-  const HomePage({super.key, required this.profile});
+  final VoidCallback? onCompose;
+  const HomePage({super.key, required this.profile, this.onCompose});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -141,29 +142,38 @@ class _HomePageState extends State<HomePage> {
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+              padding: const EdgeInsets.only(top: 8, bottom: 20),
               children: [
-                _header(data.pending),
-                const SizedBox(height: 12),
-                _storiesRow(data.stories),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'الأقسام',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _addSection,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('قسم جديد'),
-                    ),
-                  ],
-                ),
+                _composer(),
                 const SizedBox(height: 8),
-                _sections(data.videos),
+                _storiesRow(data.stories),
+                const SizedBox(height: 8),
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'الأقسام',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _addSection,
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('قسم جديد'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      _sections(data.videos),
+                    ],
+                  ),
+                ),
                 if (data.errors.isNotEmpty) ...[
                   const SizedBox(height: 18),
                   Container(
@@ -187,61 +197,176 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _header(int pending) {
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Text(
-            initialOf(widget.profile.name),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.blue,
+  Widget _composer() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(color: AppColors.yellow, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text(
+              initialOf(widget.profile.name),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'أهلًا يا ${widget.profile.name}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppColors.muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: InkWell(
+              onTap: widget.onCompose,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                height: 40,
+                alignment: AlignmentDirectional.centerStart,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.bg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'بتفكر في إيه يا ${widget.profile.name}؟',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14, color: AppColors.muted),
+                ),
               ),
-              const Text(
-                AppConfig.appName,
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
-              ),
-            ],
+            ),
           ),
-        ),
-        const NotificationBell(),
-      ],
+          IconButton(
+            tooltip: 'إضافة صور',
+            onPressed: widget.onCompose,
+            icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF2E9E5B), size: 28),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _storiesRow(List<StoryGroup> groups) {
-    return SizedBox(
-      height: 90,
+    const gradients = <List<Color>>[
+      [Color(0xFF1EA0F0), Color(0xFF0A4F8A)],
+      [Color(0xFFF5B82E), Color(0xFFC05621)],
+      [Color(0xFF3B9B6A), Color(0xFF1D5A3C)],
+      [Color(0xFFE0457B), Color(0xFF8A3FD1)],
+    ];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      height: 170,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          AddBubble(label: 'ستوريك', onTap: _addStory),
-          for (final g in groups)
+          InkWell(
+            onTap: _addStory,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 92,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.line),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      color: AppColors.yellow,
+                      alignment: Alignment.center,
+                      child: Text(
+                        initialOf(widget.profile.name),
+                        style: const TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFB7791F),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 46,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Positioned(
+                          top: -16,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.blue,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                            child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            'أنشئ قصة',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          for (var i = 0; i < groups.length; i++)
             Padding(
-              padding: const EdgeInsetsDirectional.only(start: 14),
-              child: StoryBubble(
-                label: g.userId == myId ? 'أنت' : g.name,
-                initial: initialOf(g.name),
-                color: categoryColor(categories[g.name.length % categories.length].key),
-                onTap: () => _openStory(g),
+              padding: const EdgeInsetsDirectional.only(start: 8),
+              child: InkWell(
+                onTap: () => _openStory(groups[i]),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 92,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: gradients[i % gradients.length],
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.pink,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.blue, width: 3),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          initialOf(groups[i].name),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Text(
+                        groups[i].userId == myId ? 'أنت' : groups[i].name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],
