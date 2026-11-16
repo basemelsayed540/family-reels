@@ -134,11 +134,10 @@ class _MembersListState extends State<_MembersList> {
         paths.addAll(rows.map((e) => e['path'] as String));
       }
       final posts = rowsOf(
-        await sb.from('posts').select('image_path').eq('user_id', id),
+        await sb.from('posts').select('*').eq('user_id', id),
       );
       for (final e in posts) {
-        final ip = e['image_path'] as String?;
-        if (ip != null && ip.isNotEmpty) paths.add(ip);
+        paths.addAll(postImagePaths(e));
       }
       try {
         await removeFiles(paths);

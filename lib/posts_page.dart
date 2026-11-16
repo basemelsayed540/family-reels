@@ -12,7 +12,8 @@ import 'theme.dart';
 /// صورة من التخزين الخاص (رابط موقّع) مع عرض بملء الشاشة عند الضغط
 class SignedImage extends StatefulWidget {
   final String path;
-  const SignedImage({super.key, required this.path});
+  final double? height;
+  const SignedImage({super.key, required this.path, this.height});
 
   @override
   State<SignedImage> createState() => _SignedImageState();
@@ -65,6 +66,7 @@ class _SignedImageState extends State<SignedImage> {
             child: Image.network(
               url,
               width: double.infinity,
+              height: widget.height,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => const SizedBox(
                 height: 80,
@@ -74,6 +76,53 @@ class _SignedImageState extends State<SignedImage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// عرض أكتر من صورة بالسحب الأفقي مع عدّاد
+class _ImageCarousel extends StatefulWidget {
+  final List<String> paths;
+  const _ImageCarousel({required this.paths});
+
+  @override
+  State<_ImageCarousel> createState() => _ImageCarouselState();
+}
+
+class _ImageCarouselState extends State<_ImageCarousel> {
+  int _i = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 320,
+      child: Stack(
+        children: [
+          PageView.builder(
+            itemCount: widget.paths.length,
+            onPageChanged: (i) => setState(() => _i = i),
+            itemBuilder: (_, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1),
+              child: SignedImage(path: widget.paths[i], height: 320),
+            ),
+          ),
+          PositionedDirectional(
+            top: 8,
+            end: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0x99000000),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_i + 1}/${widget.paths.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -98,7 +147,7 @@ class PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = authorOf(post);
     final body = (post['body'] ?? '').toString();
-    final imagePath = post['image_path'] as String?;
+    final images = postImagePaths(post);
     final id = post['id'] as String;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
@@ -162,9 +211,12 @@ class PostCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(body, style: const TextStyle(fontSize: 15, height: 1.5)),
           ],
-          if (imagePath != null && imagePath.isNotEmpty) ...[
+          if (images.length == 1) ...[
             const SizedBox(height: 10),
-            SignedImage(path: imagePath),
+            SignedImage(path: images.first),
+          ] else if (images.length > 1) ...[
+            const SizedBox(height: 10),
+            _ImageCarousel(paths: images),
           ],
           const SizedBox(height: 4),
           ReactionBar(
@@ -195,7 +247,7 @@ class _PostsPageState extends State<PostsPage> {
   bool _loading = true;
   String? _error;
   bool _posting = false;
-  File? _image;
+  final List<File> _images = [];
   final _picker = ImagePicker();
   final _text = TextEditingController();
 
@@ -240,8 +292,19 @@ class _PostsPageState extends State<PostsPage> {
 
   Future<void> _pickImage(ImageSource src) async {
     try {
-      final x = await _picker.pickImage(source: src, maxWidth: 1800, imageQuality: 85);
-      if (x != null && mounted) setState(() => _image = File(x.path));
+      if (src == ImageSource.gallery) {
+        final xs = await _picker.pickMultiImage(maxWidth: 1800, imageQuality: 85);
+        if (xs.isNotEmpty && mounted) {
+          setState(() => _images.addAll(xs.map((x) => File(x.path))));
+        }
+      } else {
+        final x = await _picker.pickImage(
+          source: src,
+          maxWidth: 1800,
+          imageQuality: 85,
+        );
+        if (x != null && mounted) setState(() => _images.add(File(x.path)));
+      }
     } catch (_) {
       if (mounted) showMsg(context, 'تعذّر اختيار الصورة');
     }
@@ -256,7 +319,7 @@ class _PostsPageState extends State<PostsPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('من المعرض'),
+              title: const Text('من المعرض (أكتر من صورة)'),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _pickImage(ImageSource.gallery);
@@ -278,26 +341,38 @@ class _PostsPageState extends State<PostsPage> {
 
   Future<void> _publish() async {
     final body = _text.text.trim();
-    if ((body.isEmpty && _image == null) || _posting) return;
+    if ((body.isEmpty && _images.isEmpty) || _posting) return;
     if (body.length > 1000) {
       showMsg(context, 'المنشور طويل، أقصى حد 1000 حرف');
       return;
     }
     setState(() => _posting = true);
     try {
-      String? imagePath;
-      final img = _image;
-      if (img != null) {
-        imagePath = 'posts/${myId}_${DateTime.now().millisecondsSinceEpoch}.${extOf(img.path)}';
-        await uploadFile(imagePath, img);
+      final paths = <String>[];
+      try {
+        for (var i = 0; i < _images.length; i++) {
+          final img = _images[i];
+          final path =
+              'posts/${myId}_${DateTime.now().millisecondsSinceEpoch}_$i.${extOf(img.path)}';
+          await uploadFile(path, img);
+          paths.add(path);
+        }
+        await sb.from('posts').insert({
+          'user_id': myId,
+          'body': body,
+          if (paths.isNotEmpty) 'image_path': paths.first,
+          if (paths.length > 1) 'image_paths': paths,
+        });
+      } catch (e) {
+        if (paths.isNotEmpty) {
+          try {
+            await removeFiles(paths);
+          } catch (_) {}
+        }
+        rethrow;
       }
-      await sb.from('posts').insert({
-        'user_id': myId,
-        'body': body,
-        if (imagePath != null) 'image_path': imagePath,
-      });
       _text.clear();
-      _image = null;
+      _images.clear();
       FocusManager.instance.primaryFocus?.unfocus();
       await _load();
     } catch (e) {
@@ -308,7 +383,7 @@ class _PostsPageState extends State<PostsPage> {
   }
 
   Future<void> _edit(Map<String, dynamic> post) async {
-    final hasImage = (post['image_path'] ?? '').toString().isNotEmpty;
+    final hasImage = postImagePaths(post).isNotEmpty;
     final t = await showEditTextDialog(
       context,
       title: 'تعديل المنشور',
@@ -345,11 +420,11 @@ class _PostsPageState extends State<PostsPage> {
     );
     if (ok != true) return;
     try {
-      final img = post['image_path'] as String?;
+      final imgs = postImagePaths(post);
       await sb.from('posts').delete().eq('id', post['id'] as String);
-      if (img != null && img.isNotEmpty) {
+      if (imgs.isNotEmpty) {
         try {
-          await removeFiles([img]);
+          await removeFiles(imgs);
         } catch (_) {}
       }
       await _load();
@@ -406,29 +481,48 @@ class _PostsPageState extends State<PostsPage> {
                       ),
                     ),
                   ),
-                  if (_image != null) ...[
+                  if (_images.isNotEmpty) ...[
                     const SizedBox(height: 10),
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.file(
-                            _image!,
-                            height: 160,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
+                    SizedBox(
+                      height: 96,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _images.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, i) => Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.file(
+                                _images[i],
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
+                                cacheWidth: 300,
+                              ),
+                            ),
+                            PositionedDirectional(
+                              top: 4,
+                              end: 4,
+                              child: InkWell(
+                                onTap: () => setState(() => _images.removeAt(i)),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  padding: const EdgeInsets.all(3),
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        PositionedDirectional(
-                          top: 6,
-                          end: 6,
-                          child: IconButton(
-                            onPressed: () => setState(() => _image = null),
-                            style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                            icon: const Icon(Icons.close_rounded, color: Colors.white),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                   const SizedBox(height: 10),
@@ -438,7 +532,7 @@ class _PostsPageState extends State<PostsPage> {
                         style: compactOutlined,
                         onPressed: _posting ? null : _chooseImage,
                         icon: const Icon(Icons.image_outlined, size: 18),
-                        label: const Text('صورة'),
+                        label: Text(_images.isEmpty ? 'صور' : 'أضف صور'),
                       ),
                       const Spacer(),
                       FilledButton.icon(

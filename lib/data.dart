@@ -197,3 +197,13 @@ Future<void> refreshSections() async {
     ];
   } catch (_) {}
 }
+
+/// كل مسارات صور المنشور (image_paths لو فيه أكتر من صورة، وإلا image_path)
+List<String> postImagePaths(Map<String, dynamic> post) {
+  final list = post['image_paths'];
+  if (list is List && list.isNotEmpty) {
+    return [for (final e in list) e.toString()];
+  }
+  final one = post['image_path'] as String?;
+  return (one != null && one.isNotEmpty) ? [one] : <String>[];
+}

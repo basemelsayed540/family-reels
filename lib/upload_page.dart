@@ -7,7 +7,7 @@ import 'config.dart';
 import 'data.dart';
 import 'theme.dart';
 
-/// رفع ريل (للأدمن) أو ستوري (لأي عضو مقبول)
+/// رفع ريلز أو ستوري (ملف أو أكتر) لأي عضو مقبول
 class UploadPage extends StatefulWidget {
   final Profile profile;
   final bool isStory;
@@ -20,8 +20,9 @@ class UploadPage extends StatefulWidget {
 class _UploadPageState extends State<UploadPage> {
   final _picker = ImagePicker();
   final _caption = TextEditingController();
-  File? _file;
-  int _size = 0;
+  final List<File> _files = [];
+  final Map<String, int> _sizes = {};
+  int _done = 0;
   String _category = categories.first.key;
   bool _busy = false;
   String? _error;
@@ -32,72 +33,119 @@ class _UploadPageState extends State<UploadPage> {
     super.dispose();
   }
 
-  Future<void> _pick(Future<XFile?> Function() picker) async {
+  Future<void> _addXFiles(List<XFile> xs, {bool videosOnly = false}) async {
+    var skipped = 0;
+    for (final x in xs) {
+      if (videosOnly && !isVideoPath(x.path)) {
+        skipped++;
+        continue;
+      }
+      if (_files.any((f) => f.path == x.path)) continue;
+      final f = File(x.path);
+      _sizes[f.path] = await f.length();
+      _files.add(f);
+    }
+    if (!mounted) return;
+    setState(() {
+      _error = skipped > 0 ? 'تم تجاهل $skipped ملف لأنه مش فيديو' : null;
+    });
+  }
+
+  Future<void> _pickMany({bool videosOnly = false}) async {
+    try {
+      final xs = await _picker.pickMultipleMedia();
+      if (xs.isEmpty) return;
+      await _addXFiles(xs, videosOnly: videosOnly);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذّر فتح الملفات');
+    }
+  }
+
+  Future<void> _pickOne(Future<XFile?> Function() picker) async {
     try {
       final x = await picker();
       if (x == null) return;
-      final f = File(x.path);
-      final size = await f.length();
-      if (!mounted) return;
-      setState(() {
-        _file = f;
-        _size = size;
-        _error = null;
-      });
+      await _addXFiles([x]);
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذّر فتح الملف');
     }
   }
 
+  void _removeAt(int i) {
+    setState(() {
+      _sizes.remove(_files[i].path);
+      _files.removeAt(i);
+    });
+  }
+
   Future<void> _upload() async {
-    final f = _file;
-    if (f == null) return;
-    if (_size > AppConfig.maxUploadBytes) {
-      setState(() => _error = 'الملف أكبر من 50 ميجا. اختار ملف أصغر أو قصّر الفيديو.');
+    if (_files.isEmpty) return;
+    final tooBig = _files.where((f) => (_sizes[f.path] ?? 0) > AppConfig.maxUploadBytes).length;
+    if (tooBig > 0) {
+      setState(() => _error = '$tooBig ملف أكبر من 50 ميجا. شيله أو اختار أصغر.');
       return;
     }
     setState(() {
       _busy = true;
       _error = null;
+      _done = 0;
     });
-    String? uploaded;
-    try {
-      final folder = widget.isStory ? 'stories' : 'videos';
-      final path = '$folder/${myId}_${DateTime.now().millisecondsSinceEpoch}.${extOf(f.path)}';
-      await uploadFile(path, f);
-      uploaded = path;
-      await sb.from(widget.isStory ? 'stories' : 'videos').insert({
-        'user_id': myId,
-        'path': path,
-        'caption': _caption.text.trim(),
-        if (!widget.isStory) 'category': _category,
-      });
-      if (!mounted) return;
-      showMsg(context, widget.isStory ? 'تم نشر الستوري' : 'تم رفع الفيديو');
-      Navigator.of(context).pop(true);
-    } catch (_) {
-      if (uploaded != null) {
-        try {
-          await removeFiles([uploaded]);
-        } catch (_) {}
+    final table = widget.isStory ? 'stories' : 'videos';
+    final folder = widget.isStory ? 'stories' : 'videos';
+    final failed = <File>[];
+    for (var i = 0; i < _files.length; i++) {
+      final f = _files[i];
+      String? uploaded;
+      try {
+        final path =
+            '$folder/${myId}_${DateTime.now().millisecondsSinceEpoch}_$i.${extOf(f.path)}';
+        await uploadFile(path, f);
+        uploaded = path;
+        await sb.from(table).insert({
+          'user_id': myId,
+          'path': path,
+          'caption': _caption.text.trim(),
+          if (!widget.isStory) 'category': _category,
+        });
+        if (mounted) setState(() => _done = i + 1);
+      } catch (_) {
+        failed.add(f);
+        if (uploaded != null) {
+          try {
+            await removeFiles([uploaded]);
+          } catch (_) {}
+        }
       }
-      if (!mounted) return;
+    }
+    if (!mounted) return;
+    if (failed.isEmpty) {
+      showMsg(
+        context,
+        widget.isStory
+            ? (_files.length > 1 ? 'تم نشر ${_files.length} ستوري' : 'تم نشر الستوري')
+            : (_files.length > 1 ? 'تم رفع ${_files.length} فيديو' : 'تم رفع الفيديو'),
+      );
+      Navigator.of(context).pop(true);
+    } else {
       setState(() {
         _busy = false;
-        _error = 'تعذّر الرفع. تأكد من الاتصال وصيغة الملف وحاول تاني.';
+        _files
+          ..clear()
+          ..addAll(failed);
+        _error = 'فشل رفع ${failed.length} ملف. اتأكد من الاتصال وحاول تاني.';
       });
     }
   }
 
-  String _sizeText() {
-    final mb = _size / (1024 * 1024);
-    return '${mb.toStringAsFixed(1)} ميجا';
+  String _totalSizeText() {
+    final total = _sizes.values.fold<int>(0, (a, b) => a + b);
+    return '${(total / (1024 * 1024)).toStringAsFixed(1)} ميجا';
   }
 
-  Widget _pickButton(String label, IconData icon, Future<XFile?> Function() picker) {
+  Widget _pickButton(String label, IconData icon, Future<void> Function() action) {
     return OutlinedButton.icon(
       style: compactOutlined,
-      onPressed: _busy ? null : () => _pick(picker),
+      onPressed: _busy ? null : action,
       icon: Icon(icon, size: 20),
       label: Text(label),
     );
@@ -105,9 +153,6 @@ class _UploadPageState extends State<UploadPage> {
 
   @override
   Widget build(BuildContext context) {
-    final f = _file;
-    final isImage = f != null && !isVideoPath(f.path);
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.bg,
@@ -117,47 +162,81 @@ class _UploadPageState extends State<UploadPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Container(
-              height: 220,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              clipBehavior: Clip.antiAlias,
-              alignment: Alignment.center,
-              child: f == null
-                  ? const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.video_library_outlined, size: 48, color: AppColors.blue),
-                        SizedBox(height: 8),
-                        Text('اختار ملف من الأزرار تحت'),
-                      ],
-                    )
-                  : isImage
-                      ? Image.file(f, fit: BoxFit.cover, width: double.infinity, height: 220)
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.movie_rounded, size: 52, color: AppColors.blue),
-                            const SizedBox(height: 8),
-                            Text(
-                              f.path.split('/').last,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+            if (_files.isEmpty)
+              Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                alignment: Alignment.center,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.video_library_outlined, size: 44, color: AppColors.blue),
+                    SizedBox(height: 8),
+                    Text('اختار ملف أو أكتر من الأزرار تحت'),
+                  ],
+                ),
+              )
+            else ...[
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _files.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                ),
+                itemBuilder: (context, i) {
+                  final f = _files[i];
+                  final isVid = isVideoPath(f.path);
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: isVid
+                            ? Container(
+                                color: AppColors.lightBlue,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.movie_rounded,
+                                  size: 36,
+                                  color: AppColors.blue,
+                                ),
+                              )
+                            : Image.file(f, fit: BoxFit.cover, cacheWidth: 300),
+                      ),
+                      PositionedDirectional(
+                        top: 4,
+                        end: 4,
+                        child: InkWell(
+                          onTap: _busy ? null : () => _removeAt(i),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
                             ),
-                          ],
+                            padding: const EdgeInsets.all(3),
+                            child: const Icon(Icons.close_rounded, size: 16, color: Colors.white),
+                          ),
                         ),
-            ),
-            if (f != null)
+                      ),
+                    ],
+                  );
+                },
+              ),
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'الحجم: ${_sizeText()}',
+                  '${_files.length} ملف · ${_totalSizeText()}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.muted),
                 ),
               ),
+            ],
             const SizedBox(height: 14),
             Wrap(
               spacing: 10,
@@ -165,28 +244,25 @@ class _UploadPageState extends State<UploadPage> {
               alignment: WrapAlignment.center,
               children: [
                 _pickButton(
-                  'فيديو من المعرض',
+                  widget.isStory ? 'صور وفيديوهات من المعرض' : 'فيديوهات من المعرض',
                   Icons.video_library_rounded,
-                  () => _picker.pickVideo(source: ImageSource.gallery),
+                  () => _pickMany(videosOnly: !widget.isStory),
                 ),
                 if (widget.isStory) ...[
                   _pickButton(
-                    'صورة من المعرض',
-                    Icons.photo_library_rounded,
-                    () => _picker.pickImage(source: ImageSource.gallery),
-                  ),
-                  _pickButton(
                     'تصوير فيديو',
                     Icons.videocam_rounded,
-                    () => _picker.pickVideo(
-                      source: ImageSource.camera,
-                      maxDuration: const Duration(seconds: 30),
+                    () => _pickOne(
+                      () => _picker.pickVideo(
+                        source: ImageSource.camera,
+                        maxDuration: const Duration(seconds: 30),
+                      ),
                     ),
                   ),
                   _pickButton(
                     'تصوير صورة',
                     Icons.photo_camera_rounded,
-                    () => _picker.pickImage(source: ImageSource.camera),
+                    () => _pickOne(() => _picker.pickImage(source: ImageSource.camera)),
                   ),
                 ],
               ],
@@ -229,12 +305,12 @@ class _UploadPageState extends State<UploadPage> {
             ],
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: (_busy || f == null) ? null : _upload,
+              onPressed: (_busy || _files.isEmpty) ? null : _upload,
               child: _busy
-                  ? const Row(
+                  ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(
+                        const SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
@@ -242,11 +318,15 @@ class _UploadPageState extends State<UploadPage> {
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(width: 12),
-                        Text('جاري الرفع...'),
+                        const SizedBox(width: 12),
+                        Text('جاري الرفع ($_done/${_files.length})...'),
                       ],
                     )
-                  : Text(widget.isStory ? 'انشر الستوري' : 'ارفع الفيديو'),
+                  : Text(
+                      widget.isStory
+                          ? (_files.length > 1 ? 'انشر ${_files.length} ستوري' : 'انشر الستوري')
+                          : (_files.length > 1 ? 'ارفع ${_files.length} فيديو' : 'ارفع الفيديو'),
+                    ),
             ),
           ],
         ),
