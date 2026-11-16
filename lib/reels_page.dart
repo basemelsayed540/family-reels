@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -258,6 +260,11 @@ class _ReelItemState extends State<ReelItem> {
   VideoPlayerController? _c;
   bool _loading = false;
   String? _error;
+  bool _fast = false;
+  String? _hint;
+  bool _hintForward = true;
+  Timer? _hintTimer;
+  Offset _tapPos = Offset.zero;
 
   @override
   void initState() {
@@ -277,8 +284,49 @@ class _ReelItemState extends State<ReelItem> {
 
   @override
   void dispose() {
+    _hintTimer?.cancel();
     _c?.dispose();
     super.dispose();
+  }
+
+  void _showHint(String text, bool forward) {
+    _hintTimer?.cancel();
+    setState(() {
+      _hint = text;
+      _hintForward = forward;
+    });
+    _hintTimer = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _hint = null);
+    });
+  }
+
+  Future<void> _seekBy(int seconds) async {
+    final c = _c;
+    if (c == null) return;
+    final dur = c.value.duration;
+    var target = c.value.position + Duration(seconds: seconds);
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > dur) target = dur;
+    await c.seekTo(target);
+    _showHint(seconds > 0 ? '+${seconds}ث' : '${seconds}ث', seconds > 0);
+  }
+
+  void _onDoubleTap() {
+    final width = MediaQuery.of(context).size.width;
+    _seekBy(_tapPos.dx > width / 2 ? 10 : -10);
+  }
+
+  void _startFast() {
+    final c = _c;
+    if (c == null) return;
+    c.setPlaybackSpeed(2.0);
+    if (!c.value.isPlaying) c.play();
+    setState(() => _fast = true);
+  }
+
+  void _endFast() {
+    _c?.setPlaybackSpeed(1.0);
+    if (_fast) setState(() => _fast = false);
   }
 
   Future<void> _start() async {
@@ -341,6 +389,11 @@ class _ReelItemState extends State<ReelItem> {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _togglePlay,
+            onDoubleTapDown: (d) => _tapPos = d.globalPosition,
+            onDoubleTap: _onDoubleTap,
+            onLongPressStart: (_) => _startFast(),
+            onLongPressEnd: (_) => _endFast(),
+            onLongPressCancel: _endFast,
             child: ClipRect(
               child: FittedBox(
                 fit: BoxFit.cover,
@@ -365,6 +418,69 @@ class _ReelItemState extends State<ReelItem> {
           )
         else
           const Center(child: CircularProgressIndicator(color: Colors.white)),
+        if (_fast)
+          PositionedDirectional(
+            top: 64,
+            start: 0,
+            end: 0,
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0x99000000),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '2x',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.fast_forward_rounded, color: Colors.white, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (_hint != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Align(
+                alignment: _hintForward ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 36),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0x99000000),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        if (!_hintForward)
+                          const Icon(Icons.fast_rewind_rounded, color: Colors.white),
+                        Text(
+                          _hint!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (_hintForward)
+                          const Icon(Icons.fast_forward_rounded, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (c != null)
           Center(
             child: IgnorePointer(
