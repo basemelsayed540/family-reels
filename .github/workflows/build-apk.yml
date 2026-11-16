@@ -63,6 +63,19 @@ jobs:
       - name: Get packages
         run: flutter pub get
 
+      - name: Disable Android lint (crashes on plugin sources)
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/nolint.gradle <<'EOF'
+          allprojects {
+            tasks.configureEach { t ->
+              if (t.name.startsWith('lintVital') || t.name.startsWith('lintAnalyze') || t.name.startsWith('lintReport')) {
+                t.enabled = false
+              }
+            }
+          }
+          EOF
+
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/lammatna.jks
