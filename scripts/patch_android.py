@@ -94,3 +94,67 @@ if n != 1:
 
 manifest.write_text(m, encoding="utf-8")
 print("Android project patched OK")
+
+
+# ---------- 3) native video thumbnails (MethodChannel "lammatna/thumb") ----------
+acts = list(pathlib.Path("android/app/src/main").rglob("MainActivity.kt"))
+if not acts:
+    fail("MainActivity.kt not found")
+act = acts[0]
+pkg_match = re.search(r"^package\s+([\w.]+)", act.read_text(encoding="utf-8"), re.M)
+if not pkg_match:
+    fail("package line not found in MainActivity.kt")
+act.write_text(
+    f"""package {pkg_match.group(1)}
+
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
+
+class MainActivity : FlutterActivity() {{
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {{
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lammatna/thumb")
+            .setMethodCallHandler {{ call, result ->
+                if (call.method != "thumb") {{
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }}
+                val url = call.argument<String>("url")
+                val width = call.argument<Int>("width") ?: 360
+                if (url == null) {{
+                    result.success(null)
+                    return@setMethodCallHandler
+                }}
+                Thread {{
+                    var bytes: ByteArray? = null
+                    val r = MediaMetadataRetriever()
+                    try {{
+                        r.setDataSource(url, HashMap<String, String>())
+                        var bmp = r.getFrameAtTime(300000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            ?: r.getFrameAtTime(0)
+                        if (bmp != null) {{
+                            if (bmp.width > width) {{
+                                val h = (bmp.height * width.toFloat() / bmp.width).toInt()
+                                bmp = Bitmap.createScaledBitmap(bmp, width, h, true)
+                            }}
+                            val out = ByteArrayOutputStream()
+                            bmp.compress(Bitmap.CompressFormat.JPEG, 65, out)
+                            bytes = out.toByteArray()
+                        }}
+                    }} catch (e: Exception) {{
+                        bytes = null
+                    }} finally {{
+                        try {{ r.release() }} catch (e: Exception) {{}}
+                    }}
+                    runOnUiThread {{ result.success(bytes) }}
+                }}.start()
+            }}
+    }}
+}}
+""",
+    encoding="utf-8",
+)

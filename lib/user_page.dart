@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:flutter/services.dart';
 
 import 'data.dart';
 import 'posts_page.dart';
@@ -474,7 +474,9 @@ class _PhotoViewerState extends State<_PhotoViewer> {
   }
 }
 
-/// صورة مصغّرة من أول لقطة في الفيديو (بتتخزّن مؤقتًا)
+const MethodChannel _thumbChannel = MethodChannel('lammatna/thumb');
+
+/// صورة مصغّرة من أول لقطة في الفيديو (بتتخزّن مؤقتًا، وبتتولّد من كود أندرويد داخل التطبيق)
 class VideoThumb extends StatefulWidget {
   final String path;
   const VideoThumb({super.key, required this.path});
@@ -493,13 +495,10 @@ class _VideoThumbState extends State<VideoThumb> {
     if (cached != null) return cached;
     try {
       final url = await signedUrl(widget.path);
-      final data = await VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 360,
-        quality: 60,
-        timeMs: 300,
-      );
+      final data = await _thumbChannel.invokeMethod<Uint8List>('thumb', {
+        'url': url,
+        'width': 360,
+      });
       if (data != null) VideoThumb._cache[widget.path] = data;
       return data;
     } catch (_) {
