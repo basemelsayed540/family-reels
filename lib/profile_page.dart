@@ -6,6 +6,7 @@ import 'config.dart';
 import 'data.dart';
 import 'theme.dart';
 import 'saved_page.dart';
+import 'user_page.dart';
 import 'update.dart';
 import 'upload_page.dart';
 
@@ -90,6 +91,10 @@ class _ProfilePageState extends State<ProfilePage> {
             style: const TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 22),
+          _tile(Icons.account_circle_rounded, 'صفحتي الشخصية', () {
+            openUserPage(context, p.id, p.name);
+          }),
+          const SizedBox(height: 10),
           _tile(Icons.bookmarks_rounded, 'المحفوظات', () {
             Navigator.of(context).push<void>(
               MaterialPageRoute(builder: (_) => SavedPage(profile: p)),

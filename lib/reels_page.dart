@@ -7,6 +7,7 @@ import 'config.dart';
 import 'data.dart';
 import 'saved.dart';
 import 'social.dart';
+import 'user_page.dart';
 import 'theme.dart';
 
 class ReelsPage extends StatefulWidget {
@@ -14,12 +15,16 @@ class ReelsPage extends StatefulWidget {
   final String? category;
   final String? title;
   final String? videoId;
+  final String? userId; // فيديوهات شخص معيّن
+  final String? startId; // الفيديو اللي نبدأ منه
   const ReelsPage({
     super.key,
     required this.profile,
     this.category,
     this.title,
     this.videoId,
+    this.userId,
+    this.startId,
   });
 
   @override
@@ -53,16 +58,30 @@ class _ReelsPageState extends State<ReelsPage> {
       if (widget.videoId != null) {
         videos = videos.where((v) => v['id'] == widget.videoId).toList();
       }
+      if (widget.userId != null) {
+        videos = videos.where((v) => v['user_id'] == widget.userId).toList();
+      }
+      var startIndex = 0;
+      if (widget.startId != null) {
+        final k = videos.indexWhere((v) => v['id'] == widget.startId);
+        if (k > 0) startIndex = k;
+      }
       final reactions = await fetchReactions();
       final counts = await fetchCommentCounts();
       if (!mounted) return;
       setState(() {
+        _index = startIndex;
         _videos = videos;
         _reactions = reactions;
         _counts = counts;
         _loading = false;
         _error = null;
       });
+      if (startIndex > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pc.hasClients) _pc.jumpToPage(startIndex);
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -510,7 +529,9 @@ class _ReelItemState extends State<ReelItem> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              InkWell(
+                onTap: () => openUserPage(context, widget.video['user_id'] as String, name),
+                child: Row(
                 children: [
                   Container(
                     width: 44,
@@ -542,6 +563,7 @@ class _ReelItemState extends State<ReelItem> {
                     ),
                   ),
                 ],
+              ),
               ),
               if (caption.isNotEmpty) ...[
                 const SizedBox(height: 10),

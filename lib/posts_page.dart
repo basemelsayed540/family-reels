@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'data.dart';
 import 'notifications_page.dart';
 import 'saved.dart';
+import 'user_page.dart';
 import 'social.dart';
 import 'theme.dart';
 
@@ -160,33 +161,42 @@ class PostCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: AppColors.yellow,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  initialOf(name),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                ),
-              ),
-              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      timeAgo(post['created_at'] as String),
-                      style: const TextStyle(fontSize: 12, color: AppColors.muted),
-                    ),
-                  ],
+                child: InkWell(
+                  onTap: () => openUserPage(context, post['user_id'] as String, name),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: const BoxDecoration(
+                          color: AppColors.yellow,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          initialOf(name),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              timeAgo(post['created_at'] as String),
+                              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (onDelete != null || onEdit != null)
