@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'data.dart';
+import 'link_text.dart';
 import 'theme.dart';
 
 /// بروفايل المستخدم الحالي (يتحدد عند فتح التطبيق)
@@ -860,7 +861,7 @@ class _CommentsPanelState extends State<CommentsPanel> {
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
+                                    LinkText(
                                       (c['body'] ?? '').toString(),
                                       style: const TextStyle(fontSize: 15, height: 1.5),
                                     ),

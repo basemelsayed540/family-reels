@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'data.dart';
 import 'notifications_page.dart';
+import 'link_text.dart';
 import 'saved.dart';
 import 'user_page.dart';
 import 'social.dart';
@@ -218,7 +219,7 @@ class PostCard extends StatelessWidget {
           ),
           if (body.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(body, style: const TextStyle(fontSize: 15, height: 1.5)),
+            LinkText(body, style: const TextStyle(fontSize: 15, height: 1.5)),
           ],
           if (images.length == 1) ...[
             const SizedBox(height: 10),

@@ -84,6 +84,10 @@ if "<queries>" not in m:
         '            <action android:name="android.intent.action.VIEW"/>\n'
         '            <data android:scheme="https"/>\n'
         "        </intent>\n"
+        "        <intent>\n"
+        '            <action android:name="android.intent.action.VIEW"/>\n'
+        '            <data android:scheme="http"/>\n'
+        "        </intent>\n"
         "    </queries>\n    "
     )
     m = m.replace("<application", queries + "<application", 1)
